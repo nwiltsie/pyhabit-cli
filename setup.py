@@ -10,14 +10,14 @@ setup(
         'PyYAML'
     ],
     packages = find_packages(),
-    author = "Xeross",
-    author_email = "contact@xeross.me",
+    author = "3onyc",
+    author_email = "3onyc@x3tech.com",
     license = "MIT",
     entry_points = {
         'console_scripts': [
             'habit = pyhabit_cli.cli:main'
         ]
     },
-    url = "http://github.com/xeross/pyhabit-cli",
-    download_url = "https://github.com/xeross/pyhabit-cli/tarball/master"
+    url = "http://github.com/3onyc/pyhabit-cli",
+    download_url = "https://github.com/3onyc/pyhabit-cli/tarball/master"
 )
