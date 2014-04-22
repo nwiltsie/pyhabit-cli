@@ -76,6 +76,22 @@ You can also complete checklist items:
         (-) Add ability to 'do' checklist item
         Add ability to 'add' checklist item
 
+Or add checklist items:
+
+    Home:~ nwiltsie$ habit ls cli --completed
+    cli
+        Add checklist feature +cli
+            (-) Add ability to 'do' checklist item
+            Add ability to 'add' checklist item
+
+    Home:~ nwiltsie$ habit addcheck "Test checklist feature" "checklist feature"
+    Add checklist feature
+    Confirm [y]|n:
+    Add checklist feature +cli
+        (-) Add ability to 'do' checklist item
+        Add ability to 'add' checklist item
+        Test checklist feature
+
 Show stat bars (useful when paired with GeekTool):
 
     Home:~ nwiltsie$ habit stats

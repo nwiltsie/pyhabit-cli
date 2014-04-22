@@ -142,7 +142,7 @@ def print_change(user, response):
         fragments.append("%s dropped!" % response['_tmp']['drop']['text'])
     print "\n".join(fragments)
 
-def ls(raw=False, *tags):
+def ls(raw=False, completed=False, *tags):
     """Print the incomplete tasks, optionally filtered and sorted by tag."""
     user = get_user()
 
@@ -162,12 +162,12 @@ def ls(raw=False, *tags):
             print tag
             for loop_todo in incomplete_todos:
                 if user['reverse_tag_dict'][tag] in loop_todo['tags']:
-                    print "\t" + get_todo_str(user, loop_todo).replace("\n", "\n\t")
+                    print "\t" + get_todo_str(user, loop_todo, completed_faint=completed).replace("\n", "\n\t")
             print ""
 
     else:
         for loop_todo in incomplete_todos:
-            print get_todo_str(user, loop_todo)
+            print get_todo_str(user, loop_todo, completed_faint=completed)
 
 def stats():
     """Print the HP, MP, and XP bars, with some nice coloring."""
@@ -237,19 +237,26 @@ def add(todo, due="", *tags):
 
     api.create_task(api.TYPE_TODO, todo, date=due_date, tags=added_tags)
 
-def do(*todos):
-    """Complete a task, selected by natural language, with a confirmation."""
-    todo_string = " ".join(todos)
-    api = get_api()
-    user = get_user(api)
+def match_todo_by_string(user, todo_string, todos=None, match_checklist=False):
+    """
+    Returns the best match from all the user's incomplete tasks.
 
-    todos = [t for t in user['todos'] if 'completed' in t.keys()]
+    The returned object is a dictionary with keys 'todo', 'parent' and
+    'check_index'.  'parent' and 'check_index' are only used if the matched
+    item is a checklist item, in which case they contain the parent todo and
+    the index number of the checklist item.
+    """
+    if not todos:
+        todos = [t for t in user['todos'] if 'completed' in t.keys()]
+
     incomplete_todos = []
 
     # Get all the incomplete todos and checklist items
     for todo in todos:
         if not todo['completed']:
-            incomplete_todos.append({'todo':todo, 'parent': None})
+            incomplete_todos.append({'todo':todo,
+                                     'parent': None,
+                                     'check_index': None})
             if 'checklist' in todo.keys():
                 for j, item in enumerate(todo['checklist']):
                     if not item['completed']:
@@ -262,6 +269,36 @@ def do(*todos):
     selected_todo = process.extractOne(todo_string,
                                        incomplete_todos,
                                        processor=processor)[0]
+
+    return selected_todo
+
+
+def addcheck(check, parent_str):
+    """Add a checklist item to an existing todo matched by natural language."""
+    api = get_api()
+    user = get_user(api)
+    selected_todo = match_todo_by_string(user, parent_str)
+
+    if not selected_todo:
+        print "No match found."
+    else:
+        parent = selected_todo['todo']
+        print parent['text']
+        if confirm(resp=True):
+            if not 'checklist' in parent.keys():
+                parent['checklist'] = []
+            parent['checklist'].append({'text': check, 'completed': False})
+            response = api.update_task(parent['id'], parent)
+            print get_todo_str(user, response, completed_faint=True)
+
+
+def do(*todos):
+    """Complete a task, selected by natural language, with a confirmation."""
+    todo_string = " ".join(todos)
+    api = get_api()
+    user = get_user(api)
+
+    selected_todo = match_todo_by_string(user, todo_string, match_checklist=True)
 
     print selected_todo['todo']['text']
     if confirm(resp=True):
@@ -283,7 +320,7 @@ def do(*todos):
 
 def main():
     argh_parser = argh.ArghParser()
-    argh_parser.add_commands([ls, stats, add, do])
+    argh_parser.add_commands([ls, stats, add, addcheck, do])
     argh_parser.dispatch()
 
 if __name__ == "__main__":
