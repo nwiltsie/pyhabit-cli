@@ -1,3 +1,5 @@
+#Shamelessly modified from https://github.com/imtapps/django-pretty-times/blob/master/pretty_times/pretty.py
+
 from datetime import datetime
 
 def date(time):
