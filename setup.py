@@ -7,7 +7,14 @@ setup(
     install_requires=[
         'distribute',
         'pyhabit',
-        'PyYAML'
+        'argh',
+        'argcomplete',
+        'parsedatetime',
+        'python-dateutil',
+        'tzlocal',
+        'requests',
+        'ansicolors',
+        'fuzzywuzzy',
     ],
     packages = find_packages(),
     author = "3onyc",
@@ -18,6 +25,6 @@ setup(
             'habit = pyhabit_cli.cli:main'
         ]
     },
-    url = "http://github.com/3onyc/pyhabit-cli",
-    download_url = "https://github.com/3onyc/pyhabit-cli/tarball/master"
+    url = "http://github.com/nwiltsie/pyhabit-cli",
+    download_url = "https://github.com/nwiltsie/pyhabit-cli/tarball/master"
 )

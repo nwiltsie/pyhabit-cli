@@ -254,9 +254,10 @@ def do(*todos):
         response = api.perform_task(selected_todo['id'], api.DIRECTION_UP)
         print_change(user, response)
 
-argh_parser = argh.ArghParser()
-argh_parser.add_commands([ls, stats, add, do])
+def main():
+    argh_parser = argh.ArghParser()
+    argh_parser.add_commands([ls, stats, add, do])
+    argh_parser.dispatch()
 
 if __name__ == "__main__":
-
-    argh_parser.dispatch()
+    main()
