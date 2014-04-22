@@ -21,8 +21,8 @@ from pyhabit import HabitAPI
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 def get_api():
-    user = os.environ["HABIT_ID"]
-    api_key = os.environ["HABIT_API"]
+    user = os.environ["HABIT_USER_ID"]
+    api_key = os.environ["HABIT_API_KEY"]
     return HabitAPI(user, api_key)
 
 
