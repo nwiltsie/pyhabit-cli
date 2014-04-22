@@ -52,10 +52,7 @@ Add a new to-do with optional tags and natural language due date:
     habit add "Do the thing"
     habit add --due "Tomorrow" "Do that other thing" +15min
 
--037820:~ nwiltsie$ habit ls downhole
-downhole
-    Add magnetometer reading code +downhole (Due: tomorrow)
-        Update code to drive DROP by wire +downhole (Due: 3 days ago)u
+Complete a to-do with fuzzy string selection and HabitRPG stat change feedback:
 
     Home:~ nwiltsie$ habit do submit cli
     Submit CLI to GitHub
