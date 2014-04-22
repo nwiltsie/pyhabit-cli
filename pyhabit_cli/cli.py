@@ -12,7 +12,7 @@ from parsedatetime import Calendar
 from tzlocal import get_localzone
 from dateutil import parser as dtparser
 from requests import ConnectionError
-from colors import red, green, yellow, blue
+from colors import red, green, yellow, blue, faint
 from fuzzywuzzy import process
 
 # Same-project imports
@@ -96,7 +96,7 @@ def get_user(api=None):
     user['reverse_tag_dict'] = reverse_tag_dict
     return user
 
-def get_todo_str(user, todo):
+def get_todo_str(user, todo, completed_faint=False):
     """Get a nicely formatted and colored string describing a task."""
     color = lambda x: x
     todo_str = todo['text']
@@ -112,6 +112,8 @@ def get_todo_str(user, todo):
     for check in todo['checklist']:
         if not check['completed']:
             todo_str += "\n\t%s" % check['text']
+        elif completed_faint:
+            todo_str += faint("\n\t(-) %s" % check['text'])
     todo_str = color(todo_str)
     return todo_str
 
@@ -242,17 +244,42 @@ def do(*todos):
     user = get_user(api)
 
     todos = [t for t in user['todos'] if 'completed' in t.keys()]
-    incomplete_todos = [t for t in todos if not t['completed']]
-    processor = lambda x: x['text']
+    incomplete_todos = []
+
+    # Get all the incomplete todos and checklist items
+    for todo in todos:
+        if not todo['completed']:
+            incomplete_todos.append({'todo':todo, 'parent': None})
+            if 'checklist' in todo.keys():
+                for j, item in enumerate(todo['checklist']):
+                    if not item['completed']:
+                        incomplete_todos.append({'todo':item,
+                                                 'parent':todo,
+                                                 'check_index':j})
+
+    processor = lambda x: x['todo']['text']
 
     selected_todo = process.extractOne(todo_string,
                                        incomplete_todos,
                                        processor=processor)[0]
 
-    print selected_todo['text']
+    print selected_todo['todo']['text']
     if confirm(resp=True):
-        response = api.perform_task(selected_todo['id'], api.DIRECTION_UP)
-        print_change(user, response)
+        # If it has a parent, it is a checklist item
+        parent = selected_todo['parent']
+        if parent:
+
+            # Mark the checklist item as complete within the parent and repost
+            check_index = selected_todo['check_index']
+            parent['checklist'][check_index]['completed'] = True
+            response = api.update_task(parent['id'], parent)
+            # Print the remaining sections of the task
+            print get_todo_str(user, response, completed_faint=True)
+
+        # Otherwise it is a normal to-do
+        else:
+            response = api.perform_task(selected_todo['todo']['id'], api.DIRECTION_UP)
+            print_change(user, response)
 
 def main():
     argh_parser = argh.ArghParser()

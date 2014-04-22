@@ -32,7 +32,7 @@ Usage
 
 Set your env vars for the API
 
-call it from command line using 
+call it from command line using
 
     habit <method> <arg1> <arg2> <...>
 
@@ -56,10 +56,25 @@ Complete a to-do with fuzzy string selection and HabitRPG stat change feedback:
 
     Home:~ nwiltsie$ habit do submit cli
     Submit CLI to GitHub
-    Confirm [y]|n: 
+    Confirm [y]|n:
     10 XP!
     1.6 GP!
     Pink Cotton Candy dropped!
+
+You can also complete checklist items:
+
+    Home:~ nwiltsie$ habit ls cli
+    cli
+        Add checklist feature +cli
+            Add ability to 'do' checklist item
+            Add ability to 'add' checklist item
+
+    Home:~ nwiltsie$ habit do do checklist item
+    Add ability to 'do' checklist item
+    Confirm [y]|n:
+    Add checklist feature +cli
+        (-) Add ability to 'do' checklist item
+        Add ability to 'add' checklist item
 
 Show stat bars (useful when paired with GeekTool):
 
