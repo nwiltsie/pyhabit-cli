@@ -3,6 +3,7 @@
 # Standard library imports
 import os
 import pickle
+import datetime
 from collections import defaultdict
 
 # Third party imports
@@ -142,8 +143,10 @@ def print_change(user, response):
         fragments.append("%s dropped!" % response['_tmp']['drop']['text'])
     print "\n".join(fragments)
 
-def ls(raw=False, completed=False, *tags):
-    """Print the incomplete tasks, optionally filtered and sorted by tag."""
+def ls(raw=False, completed=False, date=False, *tags):
+    """
+    Print the incomplete tasks, optionally filtered and sorted by tag and date.
+    """
     user = get_user()
 
     if user['cached']:
@@ -157,12 +160,26 @@ def ls(raw=False, completed=False, *tags):
             print i
         return
 
+    def sort_key(todo):
+        # Sort with the earliest date first, undated events at the end
+        if 'date' in todo.keys():
+            return todo['date']
+        else:
+            return datetime.datetime(9999,12,31).isoformat()
+
+    if date:
+        incomplete_todos.sort(key=sort_key)
+
     if tags:
+        tagged_todos = defaultdict(list)
+        for loop_todo in incomplete_todos:
+            for tag in loop_todo['tags']:
+                tagged_todos[tag].append(loop_todo)
+
         for tag in tags:
             print tag
-            for loop_todo in incomplete_todos:
-                if user['reverse_tag_dict'][tag] in loop_todo['tags']:
-                    print "\t" + get_todo_str(user, loop_todo, completed_faint=completed).replace("\n", "\n\t")
+            for loop_todo in tagged_todos[user['reverse_tag_dict'][tag]]:
+                print "\t" + get_todo_str(user, loop_todo, completed_faint=completed).replace("\n", "\n\t")
             print ""
 
     else:
