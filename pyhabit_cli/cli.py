@@ -9,6 +9,7 @@ from collections import defaultdict
 # Third party imports
 import argh
 import pretty
+import pytz
 from parsedatetime import Calendar
 from tzlocal import get_localzone
 from dateutil import parser as dtparser
@@ -200,9 +201,9 @@ def stats():
     print_chr = "="
     width = 60
 
-    hp_percent = float(current_hp) / max_hp
-    mp_percent = float(current_mp) / max_mp
-    xp_percent = float(current_exp) / level_exp
+    hp_percent = min(float(current_hp) / max_hp, 1.0)
+    mp_percent = min(float(current_mp) / max_mp, 1.0)
+    xp_percent = min(float(current_exp) / level_exp, 1.0)
 
     if hp_percent < 0.25:
         hp_color = red
@@ -244,11 +245,13 @@ def add(todo, due="", *tags):
         else:
             code = unaware_dt[0][1]
             unaware_dt = unaware_dt[0][0]
-
             # If no time is supplied, assume 6pm
             if code == 1:
                 unaware_dt = unaware_dt.replace(hour=18)
-        localtz = get_localzone()
+        if os.environ.get('HABIT_TZ'):
+            localtz = pytz.timezone(os.environ.get('HABIT_TZ'))
+        else:
+            localtz = get_localzone()
         aware_dt = localtz.localize(unaware_dt)
         due_date = aware_dt.isoformat()
 
