@@ -98,7 +98,7 @@ def get_user(api=None):
     user['reverse_tag_dict'] = reverse_tag_dict
     return user
 
-def get_todo_str(user, todo, completed_faint=False):
+def get_todo_str(user, todo, completed_faint=False, notes=False):
     """Get a nicely formatted and colored string describing a task."""
     color = lambda x: x
     todo_str = todo['text']
@@ -116,6 +116,8 @@ def get_todo_str(user, todo, completed_faint=False):
             todo_str += "\n\t%s" % check['text']
         elif completed_faint:
             todo_str += faint("\n\t(-) %s" % check['text'])
+    if notes and 'notes' in todo.keys() and todo['notes']:
+        todo_str += "\n\n\t%s" % todo['notes'].replace("\n", "\n\t")
     todo_str = color(todo_str)
     return todo_str
 
@@ -257,6 +259,11 @@ def add(todo, due="", *tags):
 
     api.create_task(api.TYPE_TODO, todo, date=due_date, tags=added_tags)
 
+def detail(todo_string):
+    user = get_user()
+    todo = match_todo_by_string(user, todo_string)['todo']
+    print get_todo_str(user, todo, notes=True)
+
 def match_todo_by_string(user, todo_string, todos=None, match_checklist=False):
     """
     Returns the best match from all the user's incomplete tasks.
@@ -340,7 +347,7 @@ def do(*todos):
 
 def main():
     argh_parser = argh.ArghParser()
-    argh_parser.add_commands([ls, stats, add, addcheck, do])
+    argh_parser.add_commands([ls, stats, add, addcheck, do, detail])
     argh_parser.dispatch()
 
 if __name__ == "__main__":
