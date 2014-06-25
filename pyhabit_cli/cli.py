@@ -144,7 +144,7 @@ def print_change(user, response):
         fragments.append("%0.1f GP!" % (new_gp - old_gp))
     if 'drop' in response['_tmp'].keys():
         try:
-            fragments.append("%s %s dropped!" %(response['_tmp']['drop']['key'], response['_tmp']['drop']['type'])
+            fragments.append("%s %s dropped!" %(response['_tmp']['drop']['key'], response['_tmp']['drop']['type']))
         except KeyError:
             print "Found the key error:", response['_tmp']['drop']
     print "\n".join(fragments)
