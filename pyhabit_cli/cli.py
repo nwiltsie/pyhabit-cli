@@ -103,7 +103,7 @@ def get_todo_str(user, todo, completed_faint=False, notes=False, remove_tag=None
     color = lambda x: x
     todo_str = todo['text']
     for tag in todo['tags']:
-        if tag == remove_tag:
+        if tag != remove_tag:
             todo_str += " +%s" %user['tag_dict'][tag]
             if user['tag_dict'][tag] == 'urgent':
                 color = red
