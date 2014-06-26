@@ -98,16 +98,17 @@ def get_user(api=None):
     user['reverse_tag_dict'] = reverse_tag_dict
     return user
 
-def get_todo_str(user, todo, completed_faint=False, notes=False):
+def get_todo_str(user, todo, completed_faint=False, notes=False, remove_tag=None):
     """Get a nicely formatted and colored string describing a task."""
     color = lambda x: x
     todo_str = todo['text']
     for tag in todo['tags']:
-        todo_str += " +%s" %user['tag_dict'][tag]
-        if user['tag_dict'][tag] == 'urgent':
-            color = red
-        if user['tag_dict'][tag] == '15min':
-            color = green
+        if tag == remove_tag:
+            todo_str += " +%s" %user['tag_dict'][tag]
+            if user['tag_dict'][tag] == 'urgent':
+                color = red
+            if user['tag_dict'][tag] == '15min':
+                color = green
     if 'date' in todo.keys() and todo['date']:
         dt_obj = dtparser.parse(todo['date'])
         todo_str += " (Due: %s)" % pretty.date(dt_obj)
@@ -185,7 +186,7 @@ def ls(raw=False, completed=False, date=False, *tags):
         for tag in tags:
             print tag
             for loop_todo in tagged_todos[user['reverse_tag_dict'][tag]]:
-                print "\t" + get_todo_str(user, loop_todo, completed_faint=completed).replace("\n", "\n\t")
+                print "\t" + get_todo_str(user, loop_todo, completed_faint=completed, remove_tag=tag).replace("\n", "\n\t")
             print ""
 
     else:
