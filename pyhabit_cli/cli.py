@@ -10,6 +10,7 @@ from collections import defaultdict
 import argh
 import pretty
 import pytz
+import yaml
 from parsedatetime import Calendar
 from tzlocal import get_localzone
 from dateutil import parser as dtparser
@@ -97,6 +98,25 @@ def get_user(api=None):
     user['tag_dict'] = tag_dict
     user['reverse_tag_dict'] = reverse_tag_dict
     return user
+
+def get_planning_date(todo):
+    """Extract the planning due date string from the task."""
+
+    notes_dict = yaml.load(todo['notes'])
+    if notes_dict and 'planned' in notes_dict.keys():
+        return notes_dict['planned']
+    else:
+        return None
+
+def set_planning_date(api, todo, plan_date):
+    """
+    Set the planning due date.
+    Wipes out the current 'notes' field.
+    Returns the updated todo.
+    """
+
+    todo['notes'] = yaml.dump({'planned':plan_date})
+    return api.update_task(todo['id'], todo)
 
 def get_todo_str(user, todo, completed_faint=False, notes=False, remove_tag=None):
     """Get a nicely formatted and colored string describing a task."""
