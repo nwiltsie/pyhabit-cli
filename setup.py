@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name = "habitcli",
     description = "CLI to interact with HabitRPG",
-    version = "0.1a",
+    version = "0.2a",
     install_requires=[
         'distribute',
         'pyhabit',
@@ -16,6 +16,7 @@ setup(
         'ansicolors',
         'fuzzywuzzy',
         'pyyaml',
+        'pytz',
     ],
     packages = find_packages(),
     author = "Nick Wiltsie",
