@@ -4,11 +4,13 @@ Pretty date formatting, modified from django-pretty-times.
 
 import datetime
 
+
 def date(time):
     """
     Return a pretty string describing the date, like 'tomorrow'
     or 'in two hours' or 'last week'.
     """
+
     if isinstance(time, datetime.datetime):
         now = datetime.datetime.now(time.tzinfo)
         is_datetime = True

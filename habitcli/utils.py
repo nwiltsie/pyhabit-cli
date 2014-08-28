@@ -9,6 +9,7 @@ import yaml
 from parsedatetime import Calendar
 from tzlocal import get_localzone
 
+
 # http://code.activestate.com/recipes/541096-prompt-the-user-for-confirmation/
 def confirm(prompt=None, resp=False):
     """Prompts for yes or no response from the user. Returns True for yes and
@@ -49,9 +50,11 @@ def confirm(prompt=None, resp=False):
         if ans == 'n' or ans == 'N':
             return False
 
+
 def serialize_date(date_obj):
     """Serialize a datetime object to plain text."""
     return yaml.dump(date_obj, default_flow_style=False)
+
 
 def deserialize_date(date_str):
     """Deserialize a datetime object from plain text."""
@@ -61,6 +64,7 @@ def deserialize_date(date_str):
 
     yaml.add_constructor(u'tag:yaml.org,2002:timestamp', timestamp_constructor)
     return yaml.load(date_str)
+
 
 def parse_datetime_from_date_str(date_string):
     """Parse a timetime object from a natural language string."""
@@ -83,9 +87,11 @@ def parse_datetime_from_date_str(date_string):
     aware_dt = localtz.localize(unaware_dt)
     return aware_dt
 
+
 def get_default_config_filename():
     """Return the fully-expanded default config file path."""
     return os.path.join(os.path.expanduser("~"), ".habitrc")
+
 
 def read_config_file(config_filename=None):
     """Read the configuration file and return the results."""
@@ -103,6 +109,7 @@ def read_config_file(config_filename=None):
              for task in config.get('HabitRPG', 'tasks').split(",")]
     config_dict['tasks'] = tasks
     return config_dict
+
 
 def write_default_config_file(config_filename=None):
     """Write a default configuration file."""

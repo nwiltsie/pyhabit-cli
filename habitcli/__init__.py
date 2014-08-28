@@ -15,7 +15,7 @@ from itertools import groupby
 # Third party imports
 import argh
 import dateutil.parser
-from argh.decorators import aliases, named
+from argh.decorators import named
 from tzlocal import get_localzone
 from requests import ConnectionError
 from colors import red, green, yellow, blue, faint
@@ -35,6 +35,7 @@ ALL_COLORS = [red, green, yellow, blue, black, white, magenta, cyan]
 
 CONFIG = read_config_file()
 
+
 def get_api(user_id=None, api_key=None):
     """Get the HabitRPG api object."""
     if not user_id:
@@ -43,13 +44,16 @@ def get_api(user_id=None, api_key=None):
         api_key = CONFIG["api_key"]
     return HabitAPI(user_id, api_key)
 
+
 def save_user(user):
     """Save the user object to a file."""
     pickle.dump(user, open(os.path.join(CACHE_DIR, ".habit.p"), 'wb'))
 
+
 def load_user():
     """Load the user object from the cache."""
     return pickle.load(open(os.path.join(CACHE_DIR, ".habit.p"), 'rb'))
+
 
 def get_user(api=None):
     """Get the user object from HabitRPG (if possible) or the cache."""
@@ -65,7 +69,7 @@ def get_user(api=None):
 
     if 'err' in user.keys():
         print "Error '%s': Is the configuration in %s correct?" % \
-                            (user['err'], get_default_config_filename())
+            (user['err'], get_default_config_filename())
         sys.exit(1)
 
     # Add tag dictionaries to the user object
@@ -84,6 +88,7 @@ def get_user(api=None):
     user['color_dict'] = color_dict
     return user
 
+
 def get_planning_date(todo):
     """Extract the planning due date string from the task."""
     planned_date = deserialize_date(todo['notes'])
@@ -92,6 +97,7 @@ def get_planning_date(todo):
         return planned_date
     else:
         return None
+
 
 def set_planning_date(api, todo, plan_date, submit=True):
     """
@@ -105,9 +111,11 @@ def set_planning_date(api, todo, plan_date, submit=True):
     else:
         return todo
 
+
 def has_tags(todo, tags):
     """Returns the subset of 'tags' that are applied to the todo."""
     return list(set(tags) & set(todo['tags'].keys()))
+
 
 def get_todo_str(user, todo, date=False, completed_faint=False, notes=False):
     """Get a nicely formatted and colored string describing a task."""
@@ -125,7 +133,7 @@ def get_todo_str(user, todo, date=False, completed_faint=False, notes=False):
             dt_obj = dateutil.parser.parse(todo['date'])
             due = pretty.date(dt_obj)
 
-        todo_str += " Plan: %-*s Due:%-*s"% (15, plan_date, 15, due)
+        todo_str += " Plan: %-*s Due:%-*s" % (15, plan_date, 15, due)
 
     # Underline the string if the task is urgent
     tags = [tag for tag in todo['tags'].keys() if todo['tags'][tag]]
@@ -144,6 +152,7 @@ def get_todo_str(user, todo, date=False, completed_faint=False, notes=False):
         todo_str += "\n" + wrapper.fill(todo['notes'])
 
     return todo_str
+
 
 def print_change(user, response):
     """Print the stat change expressed in the response."""
@@ -169,8 +178,9 @@ def print_change(user, response):
     if 'drop' in response['_tmp'].keys():
         drop_key = response['_tmp']['drop']['key']
         drop_type = response['_tmp']['drop']['type']
-        fragments.append("%s %s dropped!" %(drop_key, drop_type))
+        fragments.append("%s %s dropped!" % (drop_key, drop_type))
     print "\n".join(fragments)
+
 
 @named('ls')
 def list_todos(raw=False, completed=False, *tags):
@@ -206,7 +216,6 @@ def list_todos(raw=False, completed=False, *tags):
             return CONFIG['tasks'].index(tag)
         else:
             return 99999
-
 
     def sort_plan_key(todo):
         """
@@ -247,6 +256,7 @@ def list_todos(raw=False, completed=False, *tags):
             for todo in tagtodos:
                 print "\t", color(get_todo_str(user, todo))
 
+
 @named('stats')
 def print_stat_bar():
     """Print the HP, MP, and XP bars, with some nice coloring."""
@@ -282,6 +292,7 @@ def print_stat_bar():
     if user['cached']:
         print "(Cached)"
 
+
 @named('add')
 def add_todo(todo, due_date="", plan_date="", *tags):
     """Add a todo with optional tags and due date in natural language."""
@@ -295,7 +306,7 @@ def add_todo(todo, due_date="", plan_date="", *tags):
             added_tags[tag_id] = True
         else:
             valid_tags = user['reverse_tag_dict'].keys()
-            raise Exception("Tag %s not in %s" %(tag, str(valid_tags)))
+            raise Exception("Tag %s not in %s" % (tag, str(valid_tags)))
 
     due_date_obj = None
     # Process the input date string into a datetime
@@ -305,11 +316,12 @@ def add_todo(todo, due_date="", plan_date="", *tags):
     note = None
     if plan_date:
         plan_date_obj = parse_datetime_from_date_str(plan_date)
-        note = set_planning_date(api, {'notes':''},
+        note = set_planning_date(api, {'notes': ''},
                                  plan_date_obj, submit=False)['notes']
 
     api.create_task(api.TYPE_TODO, todo, date=due_date_obj,
                     tags=added_tags, notes=note)
+
 
 @named('detail')
 def print_detailed_string(todo_string):
@@ -317,6 +329,7 @@ def print_detailed_string(todo_string):
     user = get_user()
     todo = match_todo_by_string(user, todo_string)['todo']
     print get_todo_str(user, todo, notes=True)
+
 
 def match_todo_by_string(user, todo_string, todos=None, match_checklist=False):
     """
@@ -335,15 +348,15 @@ def match_todo_by_string(user, todo_string, todos=None, match_checklist=False):
     # Get all the incomplete todos and checklist items
     for todo in todos:
         if not todo['completed']:
-            incomplete_todos.append({'todo':todo,
+            incomplete_todos.append({'todo': todo,
                                      'parent': None,
                                      'check_index': None})
             if 'checklist' in todo.keys():
                 for j, item in enumerate(todo['checklist']):
                     if not item['completed']:
-                        incomplete_todos.append({'todo':item,
-                                                 'parent':todo,
-                                                 'check_index':j})
+                        incomplete_todos.append({'todo': item,
+                                                 'parent': todo,
+                                                 'check_index': j})
 
     processor = lambda x: x['todo']['text']
 
@@ -352,6 +365,7 @@ def match_todo_by_string(user, todo_string, todos=None, match_checklist=False):
                                        processor=processor)[0]
 
     return selected_todo
+
 
 def get_primary_tag(user, todo):
     """
@@ -370,6 +384,7 @@ def get_primary_tag(user, todo):
     else:
         return None
 
+
 @named('addcheck')
 def add_checklist_item(check, parent_str):
     """Add a checklist item to an existing todo matched by natural language."""
@@ -383,11 +398,12 @@ def add_checklist_item(check, parent_str):
         parent = selected_todo['todo']
         print parent['text']
         if confirm(resp=True):
-            if not 'checklist' in parent.keys():
+            if 'checklist' not in parent.keys():
                 parent['checklist'] = []
             parent['checklist'].append({'text': check, 'completed': False})
             response = api.update_task(parent['id'], parent)
             print get_todo_str(user, response, completed_faint=True)
+
 
 @named('plan')
 def update_todo_plan_date(todo, planned_date):
@@ -402,6 +418,7 @@ def update_todo_plan_date(todo, planned_date):
     if confirm(resp=True):
         set_planning_date(api, selected_todo, parsed_date)
 
+
 @named('delete')
 def delete_todo(*todos):
     """Delete a task."""
@@ -413,6 +430,7 @@ def delete_todo(*todos):
     print "Delete '%s'?" % selected_todo['text']
     if confirm(resp=True):
         api.delete_task(selected_todo['id'])
+
 
 @named('do')
 def complete_todo(*todos):
@@ -443,6 +461,7 @@ def complete_todo(*todos):
             response = api.perform_task(selected_todo['todo']['id'],
                                         api.DIRECTION_UP)
             print_change(user, response)
+
 
 def main():
     """Main entry point to the command line interface."""
