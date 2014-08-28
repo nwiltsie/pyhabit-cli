@@ -165,7 +165,8 @@ def print_change(user, response):
         fragments.append("%s %s dropped!" %(drop_key, drop_type))
     print "\n".join(fragments)
 
-def ls(raw=False, completed=False, *tags):
+@named('ls')
+def list_todos(raw=False, completed=False, *tags):
     """
     Print the incomplete tasks, optionally filtered and sorted by tag and date.
     """
@@ -227,7 +228,8 @@ def ls(raw=False, completed=False, *tags):
             for todo in tagtodos:
                 print "\t", color(get_todo_str(user, todo))
 
-def stats():
+@named('stats')
+def print_stat_bar():
     """Print the HP, MP, and XP bars, with some nice coloring."""
     user = get_user()
 
@@ -261,7 +263,8 @@ def stats():
     if user['cached']:
         print "(Cached)"
 
-def add(todo, due_date="", plan_date="", *tags):
+@named('add')
+def add_todo(todo, due_date="", plan_date="", *tags):
     """Add a todo with optional tags and due date in natural language."""
     api = get_api()
     user = get_user(api)
@@ -289,7 +292,8 @@ def add(todo, due_date="", plan_date="", *tags):
     api.create_task(api.TYPE_TODO, todo, date=due_date_obj,
                     tags=added_tags, notes=note)
 
-def detail(todo_string):
+@named('detail')
+def print_detailed_string(todo_string):
     """Print a detailed description of the described todo."""
     user = get_user()
     todo = match_todo_by_string(user, todo_string)['todo']
@@ -347,8 +351,8 @@ def get_primary_tag(user, todo):
     else:
         return 'NO TAG'
 
-
-def addcheck(check, parent_str):
+@named('addcheck')
+def add_checklist_item(check, parent_str):
     """Add a checklist item to an existing todo matched by natural language."""
     api = get_api()
     user = get_user(api)
@@ -366,7 +370,8 @@ def addcheck(check, parent_str):
             response = api.update_task(parent['id'], parent)
             print get_todo_str(user, response, completed_faint=True)
 
-def plan(todo, planned_date):
+@named('plan')
+def update_todo_plan_date(todo, planned_date):
     """Set the planning date for a task, selected by natural language."""
     api = get_api()
     user = get_user(api)
@@ -378,7 +383,8 @@ def plan(todo, planned_date):
     if confirm(resp=True):
         set_planning_date(api, selected_todo, parsed_date)
 
-def delete(*todos):
+@named('delete')
+def delete_todo(*todos):
     """Delete a task."""
     todo_string = " ".join(todos)
     api = get_api()
@@ -389,7 +395,8 @@ def delete(*todos):
     if confirm(resp=True):
         api.delete_task(selected_todo['id'])
 
-def do(*todos):
+@named('do')
+def complete_todo(*todos):
     """Complete a task, selected by natural language, with a confirmation."""
     todo_string = " ".join(todos)
     api = get_api()
@@ -421,14 +428,14 @@ def do(*todos):
 def main():
     """Main entry point to the command line interface."""
     argh_parser = argh.ArghParser()
-    argh_parser.add_commands([ls,
-                              stats,
-                              add,
-                              addcheck,
-                              delete,
-                              do,
-                              detail,
-                              plan])
+    argh_parser.add_commands([list_todos,
+                              print_stat_bar,
+                              add_todo,
+                              add_checklist_item,
+                              delete_todo,
+                              complete_todo,
+                              print_detailed_string,
+                              update_todo_plan_date])
     argh_parser.dispatch()
 
 if __name__ == "__main__":
