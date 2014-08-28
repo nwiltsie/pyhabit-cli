@@ -7,6 +7,7 @@ A command line interface to HabitRPG.
 import datetime
 import os
 import pickle
+import sys
 import textwrap
 from collections import defaultdict
 from itertools import groupby
@@ -25,21 +26,22 @@ from fuzzywuzzy import process
 import habitcli.pretty as pretty
 from pyhabit import HabitAPI
 from habitcli.utils import confirm, serialize_date, deserialize_date
-from habitcli.utils import parse_datetime_from_date_str
+from habitcli.utils import parse_datetime_from_date_str, read_config_file
+from habitcli.utils import get_default_config_filename
 
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
 
-NONE_DATE = datetime.datetime(2999, 12, 31)
-
 ALL_COLORS = [red, green, yellow, blue, black, white, magenta, cyan]
 
-TASKS = ['electro', 'iris', 'msl', 'climber', 'general', 'labup', 'climber']
+CONFIG = read_config_file()
 
-def get_api():
+def get_api(user_id=None, api_key=None):
     """Get the HabitRPG api object."""
-    user = os.environ["HABIT_USER_ID"]
-    api_key = os.environ["HABIT_API_KEY"]
-    return HabitAPI(user, api_key)
+    if not user_id:
+        user_id = CONFIG["user_id"]
+    if not api_key:
+        api_key = CONFIG["api_key"]
+    return HabitAPI(user_id, api_key)
 
 def save_user(user):
     """Save the user object to a file."""
@@ -61,12 +63,17 @@ def get_user(api=None):
         user = load_user()
         user['cached'] = True
 
+    if 'err' in user.keys():
+        print "Error '%s': Is the configuration in %s correct?" % \
+                            (user['err'], get_default_config_filename())
+        sys.exit(1)
+
     # Add tag dictionaries to the user object
     tag_dict = defaultdict(lambda: "+missingtag")
     reverse_tag_dict = defaultdict(unicode)
     color_dict = defaultdict(lambda: lambda x: x)
     colors = set(ALL_COLORS)
-    for tag in [tag for tag in user['tags'] if tag['name'] in TASKS]:
+    for tag in [tag for tag in user['tags'] if tag['name'] in CONFIG['tasks']]:
         tag_dict[tag['id']] = tag['name']
         reverse_tag_dict[tag['name']] = tag['id']
         color = colors.pop()
@@ -190,6 +197,17 @@ def list_todos(raw=False, completed=False, *tags):
             print todo
         return
 
+    def sort_primary_tag(user, todo):
+        """
+        Return the list index in CONFIG['tasks'] of the primary todo tag.
+        """
+        tag = get_primary_tag(user, todo)
+        if tag:
+            return CONFIG['tasks'].index(tag)
+        else:
+            return 99999
+
+
     def sort_plan_key(todo):
         """
         Extract the planning date for sorting, or a dummy far-future date.
@@ -199,7 +217,8 @@ def list_todos(raw=False, completed=False, *tags):
             return plan_date
         else:
             localtz = get_localzone()
-            return localtz.localize(NONE_DATE)
+            far_future_date = datetime.datetime(2999, 12, 31)
+            return localtz.localize(far_future_date)
 
     def group_plan_date(todo):
         """
@@ -215,7 +234,7 @@ def list_todos(raw=False, completed=False, *tags):
             return "Unplanned"
 
     # Sort tasks by the task tag
-    todos.sort(key=lambda x: get_primary_tag(user, x))
+    todos.sort(key=lambda x: sort_primary_tag(user, x))
     # Sort tasks by the planned do-date
     todos.sort(key=sort_plan_key)
 
@@ -343,13 +362,13 @@ def get_primary_tag(user, todo):
                 for t in todo['tags'].keys()
                 if todo['tags'][t]]
 
-    primary_tags = list(set(tag_strs) & set(TASKS))
+    primary_tags = list(set(tag_strs) & set(CONFIG['tasks']))
     assert len(primary_tags) <= 1, "There should only be one primary tag"
 
     if primary_tags:
         return primary_tags[0]
     else:
-        return 'NO TAG'
+        return None
 
 @named('addcheck')
 def add_checklist_item(check, parent_str):
@@ -427,6 +446,7 @@ def complete_todo(*todos):
 
 def main():
     """Main entry point to the command line interface."""
+
     argh_parser = argh.ArghParser()
     argh_parser.add_commands([list_todos,
                               print_stat_bar,

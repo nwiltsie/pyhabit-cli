@@ -1,5 +1,6 @@
 """Utility functions for habitcli."""
 
+import ConfigParser
 import dateutil.parser
 import os
 import pytz
@@ -81,3 +82,36 @@ def parse_datetime_from_date_str(date_string):
         localtz = get_localzone()
     aware_dt = localtz.localize(unaware_dt)
     return aware_dt
+
+def get_default_config_filename():
+    """Return the fully-expanded default config file path."""
+    return os.path.join(os.path.expanduser("~"), ".habitrc")
+
+def read_config_file(config_filename=None):
+    """Read the configuration file and return the results."""
+    if not config_filename:
+        config_filename = get_default_config_filename()
+    config = ConfigParser.SafeConfigParser()
+    if not os.path.exists(config_filename):
+        print "No log file found, writing defaults to %s" % config_filename
+        write_default_config_file(config_filename)
+    config.read(config_filename)
+    config_dict = {}
+    config_dict['user_id'] = config.get('HabitRPG', 'user_id')
+    config_dict['api_key'] = config.get('HabitRPG', 'api_key')
+    tasks = [task.strip()
+             for task in config.get('HabitRPG', 'tasks').split(",")]
+    config_dict['tasks'] = tasks
+    return config_dict
+
+def write_default_config_file(config_filename=None):
+    """Write a default configuration file."""
+    if not config_filename:
+        config_filename = get_default_config_filename()
+    config = ConfigParser.SafeConfigParser()
+    config.add_section('HabitRPG')
+    config.set('HabitRPG', 'user_id', '-1')
+    config.set('HabitRPG', 'api_key', '-1')
+    config.set('HabitRPG', 'tasks', 'morning,afternoon,evening')
+    with open(config_filename, 'wb') as config_file:
+        config.write(config_file)
