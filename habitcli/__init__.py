@@ -11,7 +11,6 @@ from itertools import groupby
 # Third party imports
 import argh
 import dateutil.parser
-import pretty
 from tzlocal import get_localzone
 from dateutil import parser as dtparser
 from requests import ConnectionError
@@ -20,9 +19,10 @@ from colors import black, white, magenta, cyan, underline
 from fuzzywuzzy import process
 
 # Same-project imports
+import habitcli.pretty
 from pyhabit import HabitAPI
-from utils import confirm, serialize_date, deserialize_date
-from utils import parse_datetime_from_date_str
+from habitcli.utils import confirm, serialize_date, deserialize_date
+from habitcli.utils import parse_datetime_from_date_str
 
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -94,6 +94,10 @@ def set_planning_date(api, todo, plan_date, submit=True):
     else:
         return todo
 
+def has_tags(todo, tags):
+    """Returns the subset of 'tags' that are applied to the todo."""
+    return list(set(tags) & set(todo['tags'].keys()))
+
 def get_todo_str(user, todo, completed_faint=False, notes=False):
     """Get a nicely formatted and colored string describing a task."""
     todo_str = todo['text']
@@ -148,10 +152,14 @@ def ls(raw=False, completed=False, *tags):
     user = get_user()
 
     if user['cached']:
-        print "Cached"
+        print 'Cached'
 
     todos = [t for t in user['todos'] if 'completed' in t.keys()]
     incomplete_todos = [t for t in todos if not t['completed']]
+
+    if tags:
+        tag_ids = [user['reverse_tag_dict'][tag.replace("+", "")] for tag in tags]
+        incomplete_todos = [t for t in incomplete_todos if has_tags(t,tag_ids)]
 
     # Print the raw json data
     if raw:
@@ -160,6 +168,9 @@ def ls(raw=False, completed=False, *tags):
         return
 
     def sort_plan_key(todo):
+        """
+        Extract the planning date for sorting, or a dummy far-future date.
+        """
         plan_date = get_planning_date(todo)
         if plan_date:
             return plan_date
@@ -168,6 +179,9 @@ def ls(raw=False, completed=False, *tags):
             return localtz.localize(NONE_DATE)
 
     def group_plan_date(todo):
+        """
+        Extract a pretty date, with all past dates listed 'OVERDUE'.
+        """
         plan_date = get_planning_date(todo)
         if plan_date:
             if plan_date.date() < datetime.datetime.now().date():
