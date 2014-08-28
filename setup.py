@@ -15,10 +15,11 @@ setup(
         'requests',
         'ansicolors',
         'fuzzywuzzy',
+        'yaml',
     ],
     packages = find_packages(),
-    author = "3onyc",
-    author_email = "3onyc@x3tech.com",
+    author = "Nick Wiltsie",
+    author_email = "nwiltsie@alum.mit.edu",
     license = "MIT",
     entry_points = {
         'console_scripts': [
