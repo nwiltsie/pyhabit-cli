@@ -1,7 +1,12 @@
+"""Utility functions for habitcli."""
+
 import dateutil.parser
+import os
 import pytz
 import yaml
+
 from parsedatetime import Calendar
+from tzlocal import get_localzone
 
 # http://code.activestate.com/recipes/541096-prompt-the-user-for-confirmation/
 def confirm(prompt=None, resp=False):
@@ -44,16 +49,20 @@ def confirm(prompt=None, resp=False):
             return False
 
 def serialize_date(date_obj):
+    """Serialize a datetime object to plain text."""
     return yaml.dump(date_obj, default_flow_style=False)
 
 def deserialize_date(date_str):
+    """Deserialize a datetime object from plain text."""
     def timestamp_constructor(loader, node):
+        """A better YAML datetime parser that is timezone aware."""
         return dateutil.parser.parse(node.value)
 
     yaml.add_constructor(u'tag:yaml.org,2002:timestamp', timestamp_constructor)
     return yaml.load(date_str)
 
 def parse_datetime_from_date_str(date_string):
+    """Parse a timetime object from a natural language string."""
     cal = Calendar()
     unaware_dt = cal.nlp(date_string)
     if not unaware_dt:

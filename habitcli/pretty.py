@@ -1,17 +1,22 @@
-#Shamelessly modified from https://github.com/imtapps/django-pretty-times/blob/master/pretty_times/pretty.py
+"""
+Pretty date formatting, modified from django-pretty-times.
+"""
 
 import datetime
 
 def date(time):
-
+    """
+    Return a pretty string describing the date, like 'tomorrow'
+    or 'in two hours' or 'last week'.
+    """
     if isinstance(time, datetime.datetime):
         now = datetime.datetime.now(time.tzinfo)
-        dt = True
+        is_datetime = True
     elif isinstance(time, datetime.date):
         now = datetime.datetime.now().date()
-        dt = False
+        is_datetime = False
     else:
-        raise Exception("Pretty needs a datetime or a date")
+        raise Exception("Pretty.date needs a datetime or a date")
 
     if time > now:
         past = False
@@ -22,15 +27,16 @@ def date(time):
 
     days = diff.days
 
-    if days is 0 and dt:
+    if days is 0 and is_datetime:
         return get_small_increments(diff.seconds, past)
     else:
         return get_large_increments(days, past)
 
 
 def get_small_increments(seconds, past):
+    """Formatting function for timedeltas less than a day."""
     if seconds < 10:
-        result = _('just now')
+        result = 'just now'
     elif seconds < 60:
         result = _pretty_format(seconds, 1, 'seconds', past)
     elif seconds < 120:
@@ -45,6 +51,7 @@ def get_small_increments(seconds, past):
 
 
 def get_large_increments(days, past):
+    """Formatting function for timedeltas more than a day."""
     if days == 0:
         result = 'today'
     elif days == 1:
@@ -67,6 +74,7 @@ def get_large_increments(days, past):
 
 
 def _pretty_format(diff_amount, units, text, past):
+    """Pretty date formatting function."""
     pretty_time = (diff_amount + units / 2) / units
     if past:
         base = "%(amount)d %(quantity)s ago"

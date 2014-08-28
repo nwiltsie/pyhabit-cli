@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 # Standard library imports
+import datetime
 import os
 import pickle
-import datetime
+import textwrap
 from collections import defaultdict
 from itertools import groupby
 
@@ -14,16 +15,18 @@ import pretty
 from tzlocal import get_localzone
 from dateutil import parser as dtparser
 from requests import ConnectionError
-from colors import red, green, yellow, blue, faint, black, white, magenta, cyan, underline
+from colors import red, green, yellow, blue, faint
+from colors import black, white, magenta, cyan, underline
 from fuzzywuzzy import process
 
 # Same-project imports
 from pyhabit import HabitAPI
 from utils import confirm, serialize_date, deserialize_date
+from utils import parse_datetime_from_date_str
 
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
 
-NONE_DATE = datetime.datetime(2999,12,31)
+NONE_DATE = datetime.datetime(2999, 12, 31)
 
 ALL_COLORS = [red, green, yellow, blue, black, white, magenta, cyan]
 
@@ -91,9 +94,8 @@ def set_planning_date(api, todo, plan_date, submit=True):
     else:
         return todo
 
-def get_todo_str(user, todo, completed_faint=False, notes=False, remove_tag=None):
+def get_todo_str(user, todo, completed_faint=False, notes=False):
     """Get a nicely formatted and colored string describing a task."""
-    color = lambda x: x
     todo_str = todo['text']
     text = todo['text']
 
@@ -106,6 +108,10 @@ def get_todo_str(user, todo, completed_faint=False, notes=False, remove_tag=None
         dt_obj = dtparser.parse(todo['date'])
         due = pretty.date(dt_obj)
     todo_str = "%-*s Plan: %-*s Due:%-*s"% (40,text,15,plan,15,due)
+    if notes:
+        wrapper = textwrap.TextWrapper(initial_indent="    ",
+                                       subsequent_indent="    ")
+        todo_str += "\n" + wrapper.fill(todo['notes'])
     return todo_str
 
 def print_change(user, response):
@@ -130,13 +136,12 @@ def print_change(user, response):
     if new_gp > old_gp:
         fragments.append("%0.1f GP!" % (new_gp - old_gp))
     if 'drop' in response['_tmp'].keys():
-        try:
-            fragments.append("%s %s dropped!" %(response['_tmp']['drop']['key'], response['_tmp']['drop']['type']))
-        except KeyError:
-            print "Found the key error:", response['_tmp']['drop']
+        drop_key = response['_tmp']['drop']['key']
+        drop_type = response['_tmp']['drop']['type']
+        fragments.append("%s %s dropped!" %(drop_key, drop_type))
     print "\n".join(fragments)
 
-def ls(raw=False, completed=False, date=False, *tags):
+def ls(raw=False, completed=False, *tags):
     """
     Print the incomplete tasks, optionally filtered and sorted by tag and date.
     """
@@ -148,9 +153,10 @@ def ls(raw=False, completed=False, date=False, *tags):
     todos = [t for t in user['todos'] if 'completed' in t.keys()]
     incomplete_todos = [t for t in todos if not t['completed']]
 
+    # Print the raw json data
     if raw:
-        for i in incomplete_todos:
-            print i
+        for todo in incomplete_todos:
+            print todo
         return
 
     def sort_plan_key(todo):
@@ -171,10 +177,9 @@ def ls(raw=False, completed=False, date=False, *tags):
         else:
             return "Unplanned"
 
-    if date:
-        incomplete_todos.sort(key=sort_key)
-
+    # Sort tasks by the task tag
     incomplete_todos.sort(key=lambda x: get_primary_tag(user, x))
+    # Sort tasks by the planned do-date
     incomplete_todos.sort(key=sort_plan_key)
 
     for plan_date, todos in groupby(incomplete_todos, group_plan_date):
@@ -220,7 +225,7 @@ def stats():
     if user['cached']:
         print "(Cached)"
 
-def add(todo, due="", plan="", *tags):
+def add(todo, due_date="", plan_date="", *tags):
     """Add a todo with optional tags and due date in natural language."""
     api = get_api()
     user = get_user(api)
@@ -231,21 +236,25 @@ def add(todo, due="", plan="", *tags):
         if tag_id:
             added_tags[tag_id] = True
         else:
-            raise Exception("Tag %s not in %s" %(tag, str(user['reverse_tag_dict'].keys())))
+            valid_tags = user['reverse_tag_dict'].keys()
+            raise Exception("Tag %s not in %s" %(tag, str(valid_tags)))
 
-    due_date = None
+    due_date_obj = None
     # Process the input date string into a datetime
-    if due:
-        due_date = parse_datetime_from_date_str(due).isoformat()
+    if due_date:
+        due_date_obj = parse_datetime_from_date_str(due_date).isoformat()
 
     note = None
-    if plan:
-        plan_date = parse_datetime_from_date_str(plan)
-        note = set_planning_date(api,{'notes':''},plan_date,submit=False)['notes']
+    if plan_date:
+        plan_date_obj = parse_datetime_from_date_str(plan_date)
+        note = set_planning_date(api, {'notes':''},
+                                 plan_date_obj, submit=False)['notes']
 
-    api.create_task(api.TYPE_TODO, todo, date=due_date, tags=added_tags, notes=note)
+    api.create_task(api.TYPE_TODO, todo, date=due_date_obj,
+                    tags=added_tags, notes=note)
 
 def detail(todo_string):
+    """Print a detailed description of the described todo."""
     user = get_user()
     todo = match_todo_by_string(user, todo_string)['todo']
     print get_todo_str(user, todo, notes=True)
@@ -286,6 +295,10 @@ def match_todo_by_string(user, todo_string, todos=None, match_checklist=False):
     return selected_todo
 
 def get_primary_tag(user, todo):
+    """
+    Get the primary tag of a todo. Each todo should have a single task tag,
+    although it may have further decorative tags.
+    """
     tag_strs = [user['tag_dict'][t] for t in todo['tags'].keys() if todo['tags'][t]]
 
     primary_tags = list(set(tag_strs) & set(TASKS))
@@ -320,9 +333,9 @@ def plan(todo, planned_date):
     api = get_api()
     user = get_user(api)
 
-    selected_todo = match_todo_by_string(user, todo, match_checklist=False)['todo']
+    selected_todo = match_todo_by_string(user, todo)['todo']
     parsed_date = parse_datetime_from_date_str(planned_date)
-    print "Change do-date of '%s' to %s?" % (selected_todo['text'], 
+    print "Change do-date of '%s' to %s?" % (selected_todo['text'],
                                              parsed_date)
     if confirm(resp=True):
         set_planning_date(api, selected_todo, parsed_date)
@@ -333,7 +346,7 @@ def delete(*todos):
     api = get_api()
     user = get_user(api)
 
-    selected_todo = match_todo_by_string(user, todo_string, match_checklist=False)['todo']
+    selected_todo = match_todo_by_string(user, todo_string)['todo']
     print "Delete '%s'?" % selected_todo['text']
     if confirm(resp=True):
         api.delete_task(selected_todo['id'])
@@ -366,6 +379,7 @@ def do(*todos):
             print_change(user, response)
 
 def main():
+    """Main entry point to the command line interface."""
     argh_parser = argh.ArghParser()
     argh_parser.add_commands([ls, stats, add, addcheck, delete, do, detail, plan])
     argh_parser.dispatch()
