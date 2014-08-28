@@ -19,7 +19,7 @@ from argh.decorators import named
 from tzlocal import get_localzone
 from requests import ConnectionError
 from colors import red, green, yellow, blue, faint
-from colors import black, white, magenta, cyan, underline
+from colors import white, magenta, cyan, underline
 from fuzzywuzzy import process
 
 # Same-project imports
@@ -31,7 +31,7 @@ from habitcli.utils import get_default_config_filename
 
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
 
-ALL_COLORS = [red, green, yellow, blue, black, white, magenta, cyan]
+ALL_COLORS = [red, green, yellow, blue, white, magenta, cyan]
 
 CONFIG = read_config_file()
 
@@ -183,7 +183,7 @@ def print_change(user, response):
 
 
 @named('ls')
-def list_todos(raw=False, completed=False, *tags):
+def list_todos(raw=False, completed=False, list_tasks=False, *tags):
     """
     Print the incomplete tasks, optionally filtered and sorted by tag and date.
     """
@@ -206,6 +206,13 @@ def list_todos(raw=False, completed=False, *tags):
         for todo in todos:
             print todo
         return
+
+    if list_tasks:
+        for task in CONFIG['tasks']:
+            print user['color_dict'][task](task),
+        else:
+            print
+            print
 
     def sort_primary_tag(user, todo):
         """
@@ -414,7 +421,7 @@ def update_todo_plan_date(todo, planned_date):
     selected_todo = match_todo_by_string(user, todo)['todo']
     parsed_date = parse_datetime_from_date_str(planned_date)
     print "Change do-date of '%s' to %s?" % (selected_todo['text'],
-                                             parsed_date)
+                                             pretty.date(parsed_date))
     if confirm(resp=True):
         set_planning_date(api, selected_todo, parsed_date)
 
