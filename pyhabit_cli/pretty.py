@@ -1,10 +1,17 @@
 #Shamelessly modified from https://github.com/imtapps/django-pretty-times/blob/master/pretty_times/pretty.py
 
-from datetime import datetime
+import datetime
 
 def date(time):
 
-    now = datetime.now(time.tzinfo)
+    if isinstance(time, datetime.datetime):
+        now = datetime.datetime.now(time.tzinfo)
+        dt = True
+    elif isinstance(time, datetime.date):
+        now = datetime.datetime.now().date()
+        dt = False
+    else:
+        raise Exception("Pretty needs a datetime or a date")
 
     if time > now:
         past = False
@@ -15,7 +22,7 @@ def date(time):
 
     days = diff.days
 
-    if days is 0:
+    if days is 0 and dt:
         return get_small_increments(diff.seconds, past)
     else:
         return get_large_increments(days, past)
@@ -38,7 +45,9 @@ def get_small_increments(seconds, past):
 
 
 def get_large_increments(days, past):
-    if days == 1:
+    if days == 0:
+        result = 'today'
+    elif days == 1:
         result = past and 'yesterday' or 'tomorrow'
     elif days < 7:
         result = _pretty_format(days, 1, 'days', past)
