@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name = "pyhabit-cli",
+    name = "habitcli",
     description = "CLI to interact with HabitRPG",
     version = "0.1a",
     install_requires=[
@@ -15,7 +15,7 @@ setup(
         'requests',
         'ansicolors',
         'fuzzywuzzy',
-        'yaml',
+        'pyyaml',
     ],
     packages = find_packages(),
     author = "Nick Wiltsie",
@@ -23,7 +23,7 @@ setup(
     license = "MIT",
     entry_points = {
         'console_scripts': [
-            'habit = pyhabit_cli.cli:main'
+            'habit = habitcli:main'
         ]
     },
     url = "http://github.com/nwiltsie/pyhabit-cli",
