@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+A command line interface to HabitRPG.
+"""
 
 # Standard library imports
 import datetime
@@ -11,15 +14,15 @@ from itertools import groupby
 # Third party imports
 import argh
 import dateutil.parser
+from argh.decorators import aliases, named
 from tzlocal import get_localzone
-from dateutil import parser as dtparser
 from requests import ConnectionError
 from colors import red, green, yellow, blue, faint
 from colors import black, white, magenta, cyan, underline
 from fuzzywuzzy import process
 
 # Same-project imports
-import habitcli.pretty
+import habitcli.pretty as pretty
 from pyhabit import HabitAPI
 from habitcli.utils import confirm, serialize_date, deserialize_date
 from habitcli.utils import parse_datetime_from_date_str
@@ -33,6 +36,7 @@ ALL_COLORS = [red, green, yellow, blue, black, white, magenta, cyan]
 TASKS = ['electro', 'iris', 'msl', 'climber', 'general', 'labup', 'climber']
 
 def get_api():
+    """Get the HabitRPG api object."""
     user = os.environ["HABIT_USER_ID"]
     api_key = os.environ["HABIT_API_KEY"]
     return HabitAPI(user, api_key)
@@ -62,7 +66,7 @@ def get_user(api=None):
     reverse_tag_dict = defaultdict(unicode)
     color_dict = defaultdict(lambda: lambda x: x)
     colors = set(ALL_COLORS)
-    for tag in user['tags']:
+    for tag in [tag for tag in user['tags'] if tag['name'] in TASKS]:
         tag_dict[tag['id']] = tag['name']
         reverse_tag_dict[tag['name']] = tag['id']
         color = colors.pop()
@@ -98,24 +102,40 @@ def has_tags(todo, tags):
     """Returns the subset of 'tags' that are applied to the todo."""
     return list(set(tags) & set(todo['tags'].keys()))
 
-def get_todo_str(user, todo, completed_faint=False, notes=False):
+def get_todo_str(user, todo, date=False, completed_faint=False, notes=False):
     """Get a nicely formatted and colored string describing a task."""
-    todo_str = todo['text']
-    text = todo['text']
+    todo_str = "%-*s" % (40, todo['text'])
 
-    plan = ""
-    planned_date = get_planning_date(todo)
-    if planned_date:
-        plan = pretty.date(planned_date)
-    due = ""
-    if 'date' in todo.keys() and todo['date']:
-        dt_obj = dtparser.parse(todo['date'])
-        due = pretty.date(dt_obj)
-    todo_str = "%-*s Plan: %-*s Due:%-*s"% (40,text,15,plan,15,due)
+    # If dates should be printed, add the planning and drop-dead dates
+    if date:
+        plan_date = ""
+        plan_date_obj = get_planning_date(todo)
+        if plan_date_obj:
+            plan_date = pretty.date(plan_date_obj)
+
+        due = ""
+        if 'date' in todo.keys() and todo['date']:
+            dt_obj = dateutil.parser.parse(todo['date'])
+            due = pretty.date(dt_obj)
+
+        todo_str += " Plan: %-*s Due:%-*s"% (15, plan_date, 15, due)
+
+    # Underline the string if the task is urgent
+    tags = [tag for tag in todo['tags'].keys() if todo['tags'][tag]]
+    if 'urgent' in [user['tag_dict'][tag] for tag in tags]:
+        todo_str = underline(todo_str)
+
+    # Make the string faint if it has been completed
+    if completed_faint:
+        if 'completed' in todo.keys() and todo['completed']:
+            todo_str = faint(todo_str)
+
+    # Format the notes as an indented block of text
     if notes:
-        wrapper = textwrap.TextWrapper(initial_indent="    ",
-                                       subsequent_indent="    ")
+        wrapper = textwrap.TextWrapper(initial_indent=" "*4,
+                                       subsequent_indent=""*4)
         todo_str += "\n" + wrapper.fill(todo['notes'])
+
     return todo_str
 
 def print_change(user, response):
@@ -155,15 +175,17 @@ def ls(raw=False, completed=False, *tags):
         print 'Cached'
 
     todos = [t for t in user['todos'] if 'completed' in t.keys()]
-    incomplete_todos = [t for t in todos if not t['completed']]
+
+    if not completed:
+        todos = [t for t in todos if not t['completed']]
 
     if tags:
-        tag_ids = [user['reverse_tag_dict'][tag.replace("+", "")] for tag in tags]
-        incomplete_todos = [t for t in incomplete_todos if has_tags(t,tag_ids)]
+        tag_ids = [user['reverse_tag_dict'][t.replace("+", "")] for t in tags]
+        todos = [todo for todo in todos if has_tags(todo, tag_ids)]
 
     # Print the raw json data
     if raw:
-        for todo in incomplete_todos:
+        for todo in todos:
             print todo
         return
 
@@ -192,17 +214,18 @@ def ls(raw=False, completed=False, *tags):
             return "Unplanned"
 
     # Sort tasks by the task tag
-    incomplete_todos.sort(key=lambda x: get_primary_tag(user, x))
+    todos.sort(key=lambda x: get_primary_tag(user, x))
     # Sort tasks by the planned do-date
-    incomplete_todos.sort(key=sort_plan_key)
+    todos.sort(key=sort_plan_key)
 
-    for plan_date, todos in groupby(incomplete_todos, group_plan_date):
+    for plan_date, grouped_todos in groupby(todos, group_plan_date):
         print "%s:" % plan_date
 
-        for tag, tagtodos in groupby(todos, lambda x: get_primary_tag(user, x)):
+        for tag, tagtodos in groupby(grouped_todos,
+                                     lambda x: get_primary_tag(user, x)):
             color = user['color_dict'][tag]
-            for t in tagtodos:
-                print "\t", color(t['text'])
+            for todo in tagtodos:
+                print "\t", color(get_todo_str(user, todo))
 
 def stats():
     """Print the HP, MP, and XP bars, with some nice coloring."""
@@ -215,7 +238,6 @@ def stats():
     current_exp = int(user['stats']['exp'])
     level_exp = int(user['stats']['toNextLevel'])
 
-    print_chr = "="
     width = 60
 
     hp_percent = min(float(current_hp) / max_hp, 1.0)
@@ -229,9 +251,9 @@ def stats():
     else:
         hp_color = green
 
-    hp_bar = (print_chr*int(hp_percent*width)).ljust(width)
-    mp_bar = (print_chr*int(mp_percent*width)).ljust(width)
-    xp_bar = (print_chr*int(xp_percent*width)).ljust(width)
+    hp_bar = ("="*int(hp_percent*width)).ljust(width)
+    mp_bar = ("="*int(mp_percent*width)).ljust(width)
+    xp_bar = ("="*int(xp_percent*width)).ljust(width)
 
     print "HP: " + hp_color("[" + hp_bar + "]")
     print "MP: " + blue("[" + mp_bar + "]")
@@ -246,8 +268,8 @@ def add(todo, due_date="", plan_date="", *tags):
 
     added_tags = {}
     for tag in tags:
-        tag_id = user['reverse_tag_dict'][tag.replace("+", "")]
-        if tag_id:
+        if tag.replace("+", "") in user['reverse_tag_dict'].keys():
+            tag_id = user['reverse_tag_dict'][tag.replace("+", "")]
             added_tags[tag_id] = True
         else:
             valid_tags = user['reverse_tag_dict'].keys()
@@ -313,7 +335,9 @@ def get_primary_tag(user, todo):
     Get the primary tag of a todo. Each todo should have a single task tag,
     although it may have further decorative tags.
     """
-    tag_strs = [user['tag_dict'][t] for t in todo['tags'].keys() if todo['tags'][t]]
+    tag_strs = [user['tag_dict'][t]
+                for t in todo['tags'].keys()
+                if todo['tags'][t]]
 
     primary_tags = list(set(tag_strs) & set(TASKS))
     assert len(primary_tags) <= 1, "There should only be one primary tag"
@@ -365,14 +389,15 @@ def delete(*todos):
     if confirm(resp=True):
         api.delete_task(selected_todo['id'])
 
-
 def do(*todos):
     """Complete a task, selected by natural language, with a confirmation."""
     todo_string = " ".join(todos)
     api = get_api()
     user = get_user(api)
 
-    selected_todo = match_todo_by_string(user, todo_string, match_checklist=True)
+    selected_todo = match_todo_by_string(user,
+                                         todo_string,
+                                         match_checklist=True)
 
     print selected_todo['todo']['text']
     if confirm(resp=True):
@@ -389,13 +414,21 @@ def do(*todos):
 
         # Otherwise it is a normal to-do
         else:
-            response = api.perform_task(selected_todo['todo']['id'], api.DIRECTION_UP)
+            response = api.perform_task(selected_todo['todo']['id'],
+                                        api.DIRECTION_UP)
             print_change(user, response)
 
 def main():
     """Main entry point to the command line interface."""
     argh_parser = argh.ArghParser()
-    argh_parser.add_commands([ls, stats, add, addcheck, delete, do, detail, plan])
+    argh_parser.add_commands([ls,
+                              stats,
+                              add,
+                              addcheck,
+                              delete,
+                              do,
+                              detail,
+                              plan])
     argh_parser.dispatch()
 
 if __name__ == "__main__":
