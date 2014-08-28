@@ -93,16 +93,26 @@ def get_default_config_filename():
     return os.path.join(os.path.expanduser("~"), ".habitrc")
 
 
-def read_config_file(config_filename=None):
+def read_config(config_filename=None):
     """Read the configuration file and return the results."""
+    config_dict = {}
     if not config_filename:
         config_filename = get_default_config_filename()
     config = ConfigParser.SafeConfigParser()
     if not os.path.exists(config_filename):
-        print "No log file found, writing defaults to %s" % config_filename
-        write_default_config_file(config_filename)
+        if 'HABIT_USER_ID' in os.environ.keys() and \
+                'HABIT_API_KEY' in os.environ.keys() and \
+                'HABIT_TASKS' in os.environ.keys():
+            config_dict['user_id'] = os.environ['HABIT_USER_ID']
+            config_dict['api_key'] = os.environ['HABIT_API_KEY']
+            tasks = [task.strip()
+                for task in os.environ['HABIT_TASKS'].split(",")]
+            config_dict['tasks'] = tasks
+            return config_dict
+        else:
+            print "No log file found, writing defaults to %s" % config_filename
+            write_default_config_file(config_filename)
     config.read(config_filename)
-    config_dict = {}
     config_dict['user_id'] = config.get('HabitRPG', 'user_id')
     config_dict['api_key'] = config.get('HabitRPG', 'api_key')
     tasks = [task.strip()

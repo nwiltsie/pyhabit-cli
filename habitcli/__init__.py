@@ -26,14 +26,14 @@ from fuzzywuzzy import process
 import habitcli.pretty as pretty
 from pyhabit import HabitAPI
 from habitcli.utils import confirm, serialize_date, deserialize_date
-from habitcli.utils import parse_datetime_from_date_str, read_config_file
+from habitcli.utils import parse_datetime_from_date_str, read_config
 from habitcli.utils import get_default_config_filename
 
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ALL_COLORS = [red, green, yellow, blue, white, magenta, cyan]
 
-CONFIG = read_config_file()
+CONFIG = read_config()
 
 
 def get_api(user_id=None, api_key=None):
