@@ -112,17 +112,22 @@ def get_user(api=None):
     user['color_dict'] = color_dict
     return user
 
-def get_planning_date(todo):
-    """Extract the planning due date string from the task."""
+def serialize_date(date_obj):
+    return yaml.dump(date_obj, default_flow_style=False)
 
+def deserialize_date(date_str):
     def timestamp_constructor(loader, node):
         return dateutil.parser.parse(node.value)
 
     yaml.add_constructor(u'tag:yaml.org,2002:timestamp', timestamp_constructor)
+    return yaml.load(date_str)
 
-    notes_dict = yaml.load(todo['notes'])
-    if notes_dict and 'planned' in notes_dict.keys():
-        return notes_dict['planned']
+def get_planning_date(todo):
+    """Extract the planning due date string from the task."""
+    planned_date = deserialize_date(todo['notes'])
+
+    if planned_date:
+        return planned_date
     else:
         return None
 
@@ -132,8 +137,7 @@ def set_planning_date(api, todo, plan_date, submit=True):
     Wipes out the current 'notes' field.
     Returns the updated todo.
     """
-    note = yaml.dump({'planned':plan_date}, default_flow_style=False)
-    todo['notes'] = note
+    todo['notes'] = serialize_date(plan_date)
     if submit:
         return api.update_task(todo['id'], todo)
     else:
