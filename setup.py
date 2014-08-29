@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name = "habitcli",
     description = "CLI to interact with HabitRPG",
-    version = "0.2a",
+    version = "0.3a",
     install_requires=[
         'distribute',
         'pyhabit',
