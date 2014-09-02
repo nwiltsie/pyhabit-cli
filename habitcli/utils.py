@@ -96,9 +96,15 @@ def get_default_config_filename():
 def read_config(config_filename=None):
     """Read the configuration file and return the results."""
     config_dict = {}
+
     if not config_filename:
         config_filename = get_default_config_filename()
+
     config = ConfigParser.SafeConfigParser()
+
+    # If the config file does not exist, try to fetch the config details from
+    # the environment; if that fails, write the default config file. Otherwise,
+    # read the values from the config file (which may have just been written).
     if not os.path.exists(config_filename):
         if 'HABIT_USER_ID' in os.environ.keys() and \
                 'HABIT_API_KEY' in os.environ.keys() and \
@@ -106,18 +112,26 @@ def read_config(config_filename=None):
             config_dict['user_id'] = os.environ['HABIT_USER_ID']
             config_dict['api_key'] = os.environ['HABIT_API_KEY']
             tasks = [task.strip()
-                for task in os.environ['HABIT_TASKS'].split(",")]
+                     for task in os.environ['HABIT_TASKS'].split(",")]
             config_dict['tasks'] = tasks
             return config_dict
         else:
             print "No log file found, writing defaults to %s" % config_filename
             write_default_config_file(config_filename)
+
     config.read(config_filename)
-    config_dict['user_id'] = config.get('HabitRPG', 'user_id')
-    config_dict['api_key'] = config.get('HabitRPG', 'api_key')
-    tasks = [task.strip()
-             for task in config.get('HabitRPG', 'tasks').split(",")]
-    config_dict['tasks'] = tasks
+    for key, value in config.items('HabitRPG'):
+        config_dict[key] = value
+    # Expand comma-separated string of tasks into list
+    task_str = config_dict['tasks']
+    config_dict['tasks'] = [task.split(':')[0].strip()
+                            for task in task_str.split(',')]
+    # Expand comma-separated string of task:color into a dict
+    taskcolors = {}
+    for task, color in [pair.split(':')
+                        for pair in task_str.split(',')]:
+        taskcolors[task.strip()] = color.strip()
+    config_dict['taskcolors'] = taskcolors
     return config_dict
 
 

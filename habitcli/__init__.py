@@ -14,12 +14,11 @@ from itertools import groupby
 
 # Third party imports
 import argh
+import colors
 import dateutil.parser
 from argh.decorators import named
 from tzlocal import get_localzone
 from requests import ConnectionError
-from colors import red, green, yellow, blue, faint
-from colors import white, magenta, cyan, underline
 from fuzzywuzzy import process
 
 # Same-project imports
@@ -30,8 +29,6 @@ from habitcli.utils import parse_datetime_from_date_str, read_config
 from habitcli.utils import get_default_config_filename
 
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
-
-ALL_COLORS = [red, green, yellow, blue, white, magenta, cyan]
 
 CONFIG = read_config()
 
@@ -76,13 +73,16 @@ def get_user(api=None):
     tag_dict = defaultdict(lambda: "+missingtag")
     reverse_tag_dict = defaultdict(unicode)
     color_dict = defaultdict(lambda: lambda x: x)
-    colors = set(ALL_COLORS)
     for tag in [tag for tag in user['tags'] if tag['name'] in CONFIG['tasks']]:
         tag_dict[tag['id']] = tag['name']
         reverse_tag_dict[tag['name']] = tag['id']
-        color = colors.pop()
-        color_dict[tag['name']] = color
-        color_dict[tag['id']] = color
+
+        if tag['name'] in CONFIG['taskcolors'].keys():
+            if CONFIG['taskcolors'][tag['name']] in colors.COLORS:
+                color = getattr(colors, CONFIG['taskcolors'][tag['name']])
+                color_dict[tag['name']] = color
+                color_dict[tag['id']] = color
+
     user['tag_dict'] = tag_dict
     user['reverse_tag_dict'] = reverse_tag_dict
     user['color_dict'] = color_dict
@@ -138,12 +138,12 @@ def get_todo_str(user, todo, date=False, completed_faint=False, notes=False):
     # Underline the string if the task is urgent
     tags = [tag for tag in todo['tags'].keys() if todo['tags'][tag]]
     if 'urgent' in [user['tag_dict'][tag] for tag in tags]:
-        todo_str = underline(todo_str)
+        todo_str = colors.underline(todo_str)
 
     # Make the string faint if it has been completed
     if completed_faint:
         if 'completed' in todo.keys() and todo['completed']:
-            todo_str = faint(todo_str)
+            todo_str = colors.faint(todo_str)
 
     # Format the notes as an indented block of text
     if notes:
@@ -283,18 +283,18 @@ def print_stat_bar():
     xp_percent = min(float(current_exp) / level_exp, 1.0)
 
     if hp_percent < 0.25:
-        hp_color = red
+        hp_color = colors.red
     elif hp_percent < 0.5:
-        hp_color = yellow
+        hp_color = colors.yellow
     else:
-        hp_color = green
+        hp_color = colors.green
 
     hp_bar = ("="*int(hp_percent*width)).ljust(width)
     mp_bar = ("="*int(mp_percent*width)).ljust(width)
     xp_bar = ("="*int(xp_percent*width)).ljust(width)
 
     print "HP: " + hp_color("[" + hp_bar + "]")
-    print "MP: " + blue("[" + mp_bar + "]")
+    print "MP: " + colors.blue("[" + mp_bar + "]")
     print "XP: [" + xp_bar + "]"
     if user['cached']:
         print "(Cached)"
