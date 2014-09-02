@@ -2,7 +2,7 @@ from nose.tools import *
 import habitcli
 
 def setup():
-    print "SETUP!"
+    print "SET UP!"
 
 def teardown():
     print "TEAR DOWN!"
@@ -14,6 +14,14 @@ def test_serializing():
     date_str = habitcli.serialize_date(test_date)
     deser_date = habitcli.deserialize_date(date_str)
     assert_equals(test_date, deser_date) 
+
+@with_setup(setup, teardown)
+def test_stats():
+    habitcli.print_stat_bar()
+
+@with_setup(setup, teardown)
+def test_ls():
+    habitcli.list_todos()
 
 def test_basic():
     return
