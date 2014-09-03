@@ -103,6 +103,21 @@ class HabitCLI(object):
         else:
             return todo
 
+    def get_due_date(self, todo):
+        """Extract the due date from the task as a datetime."""
+        if hasattr(todo, 'date'):
+            return parse_datetime(todo['date'])
+        else:
+            return None
+
+    def set_due_date(self, todo, due_date, api=None):
+        """Set the due date."""
+        todo['date'] = due_date.isoformat()
+        if api:
+            return api.update_task(todo['id'], todo)
+        else:
+            return todo
+
     def get_todo_str(self,
                      todo,
                      date=False,
@@ -273,7 +288,8 @@ class HabitCLI(object):
         due_date_obj = None
         # Process the input date string into a datetime
         if due_date:
-            due_date_obj = parse_datetime(due_date).isoformat()
+            due_date_obj = self.set_due_date({},
+                                             parse_datetime(due_date))['date']
 
         note = None
         if plan_date:
