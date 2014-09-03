@@ -73,7 +73,7 @@ class SimpleTableInput(tk.Frame):
 
                     if new_plan_date != habitcli.get_planning_date(old_todo):
                         fragments.append("Plan Date: From %s to %s" % (habitcli.get_planning_date(old_todo), new_plan_date))
-                        habitcli.set_planning_date(None, new_todo, new_plan_date, submit=False)
+                        habitcli.set_planning_date(new_todo, new_plan_date)
                     old_due_date = habitcli.parse_datetime_from_date_str(old_todo['date']) if hasattr(old_todo, 'date') else None
                     if new_due_date != old_due_date:
                         fragments.append("Due Date: From %s to %s" % (old_due_date, new_due_date))

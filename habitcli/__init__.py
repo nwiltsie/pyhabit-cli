@@ -99,14 +99,14 @@ def get_planning_date(todo):
         return None
 
 
-def set_planning_date(api, todo, plan_date, submit=True):
+def set_planning_date(todo, plan_date, api=None):
     """
     Set the planning due date.
     Wipes out the current 'notes' field.
     Returns the updated todo.
     """
     todo['notes'] = serialize_date(plan_date)
-    if submit:
+    if api:
         return api.update_task(todo['id'], todo)
     else:
         return todo
@@ -298,8 +298,8 @@ def add_todo(todo, due_date="", plan_date="", *tags):
     note = None
     if plan_date:
         plan_date_obj = parse_datetime_from_date_str(plan_date)
-        note = set_planning_date(api, {'notes': ''},
-                                 plan_date_obj, submit=False)['notes']
+        note = set_planning_date({'notes': ''},
+                                 plan_date_obj)['notes']
 
     api.create_task(api.TYPE_TODO, todo, date=due_date_obj,
                     tags=added_tags, notes=note)
@@ -398,7 +398,7 @@ def update_todo_plan_date(todo, planned_date):
     print "Change do-date of '%s' to %s?" % (selected_todo['text'],
                                              pretty.date(parsed_date))
     if confirm(resp=True):
-        set_planning_date(api, selected_todo, parsed_date)
+        set_planning_date(selected_todo, parsed_date, api)
 
 
 @named('delete')
