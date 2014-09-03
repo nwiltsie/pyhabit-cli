@@ -13,6 +13,7 @@ from tzlocal import get_localzone
 class DateParseException(Exception):
     def __init__(self, value):
         self.value = value
+
     def __str__(self):
         return repr(self.value)
 
@@ -161,7 +162,8 @@ def write_default_config_file(config_filename=None):
 
 def _get_incomplete_todos():
     import habitcli
-    user = habitcli.get_user()
+    hcli = habitcli.HabitCLI()
+    user = hcli.get_user()
     todos = [t for t in user['todos'] if 'completed' in t.keys()]
     todos = [t for t in todos if not t['completed']]
     return todos
