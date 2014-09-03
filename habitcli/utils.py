@@ -3,6 +3,7 @@
 import ConfigParser
 import dateutil.parser
 import os
+import pickle
 import pytz
 import yaml
 
@@ -10,7 +11,18 @@ from parsedatetime import Calendar
 from tzlocal import get_localzone
 
 
+CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
+
+
 class DateParseException(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class DateFormatException(Exception):
     def __init__(self, value):
         self.value = value
 
@@ -158,6 +170,16 @@ def write_default_config_file(config_filename=None):
     config.set('HabitRPG', 'tasks', 'morning,afternoon,evening')
     with open(config_filename, 'wb') as config_file:
         config.write(config_file)
+
+
+def save_user(user):
+    """Save the user object to a file."""
+    pickle.dump(user, open(os.path.join(CACHE_DIR, ".habit.p"), 'wb'))
+
+
+def load_user():
+    """Load the user object from the cache."""
+    return pickle.load(open(os.path.join(CACHE_DIR, ".habit.p"), 'rb'))
 
 
 def _get_incomplete_todos():

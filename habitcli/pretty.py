@@ -3,6 +3,7 @@ Pretty date formatting, modified from django-pretty-times.
 """
 
 import datetime
+from habitcli.utils import DateFormatException
 
 
 def date(time):
@@ -18,7 +19,8 @@ def date(time):
         now = datetime.datetime.now().date()
         is_datetime = False
     else:
-        raise Exception("Pretty.date needs a datetime or a date, input is a %s" % type(time))
+        raise DateFormatException("Pretty.date needs a datetime or a date, \
+                                  input is a %s" % type(time))
 
     if time > now:
         past = False

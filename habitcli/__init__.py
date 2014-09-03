@@ -5,8 +5,6 @@ A command line interface to HabitRPG.
 
 # Standard library imports
 import datetime
-import os
-import pickle
 import sys
 import textwrap
 from collections import defaultdict
@@ -26,9 +24,7 @@ import habitcli.pretty as pretty
 from pyhabit import HabitAPI
 from habitcli.utils import confirm, serialize_date, deserialize_date
 from habitcli.utils import parse_datetime_from_date_str, read_config
-from habitcli.utils import get_default_config_filename
-
-CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
+from habitcli.utils import get_default_config_filename, save_user, load_user
 
 
 class HabitCLI(object):
@@ -50,22 +46,14 @@ class HabitCLI(object):
         self.api = HabitAPI(user_id, api_key)
         return self.api
 
-    def save_user(self, user):
-        """Save the user object to a file."""
-        pickle.dump(user, open(os.path.join(CACHE_DIR, ".habit.p"), 'wb'))
-
-    def load_user(self):
-        """Load the user object from the cache."""
-        return pickle.load(open(os.path.join(CACHE_DIR, ".habit.p"), 'rb'))
-
     def get_user(self):
         """Get the user object from HabitRPG (if possible) or the cache."""
         try:
             self.user = self.api.user()
-            self.save_user(self.user)
+            save_user(self.user)
             self.user['cached'] = False
         except ConnectionError:
-            self.user = self.load_user()
+            self.user = load_user()
             self.user['cached'] = True
 
         if 'err' in self.user.keys():
