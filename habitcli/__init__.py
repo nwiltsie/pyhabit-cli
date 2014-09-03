@@ -214,28 +214,6 @@ def list_todos(raw=False, completed=False, list_tasks=False, *tags):
             print
             print
 
-    def sort_primary_tag(user, todo):
-        """
-        Return the list index in CONFIG['tasks'] of the primary todo tag.
-        """
-        tag = get_primary_tag(user, todo)
-        if tag:
-            return CONFIG['tasks'].index(tag)
-        else:
-            return 99999
-
-    def sort_plan_key(todo):
-        """
-        Extract the planning date for sorting, or a dummy far-future date.
-        """
-        plan_date = get_planning_date(todo)
-        if plan_date:
-            return plan_date
-        else:
-            localtz = get_localzone()
-            far_future_date = datetime.datetime(2999, 12, 31)
-            return localtz.localize(far_future_date)
-
     def group_plan_date(todo):
         """
         Extract a pretty date, with all past dates listed 'OVERDUE'.
@@ -249,10 +227,7 @@ def list_todos(raw=False, completed=False, list_tasks=False, *tags):
         else:
             return "Unplanned"
 
-    # Sort tasks by the task tag
-    todos.sort(key=lambda x: sort_primary_tag(user, x))
-    # Sort tasks by the planned do-date
-    todos.sort(key=sort_plan_key)
+    todos = _nice_sort(todos, user)
 
     for plan_date, grouped_todos in groupby(todos, group_plan_date):
         print "%s:" % plan_date
@@ -469,6 +444,38 @@ def complete_todo(*todos):
                                         api.DIRECTION_UP)
             print_change(user, response)
 
+
+def _nice_sort(todos, user=None):
+    if not user:
+        user = get_user()
+    def sort_primary_tag(user, todo):
+        """
+        Return the list index in CONFIG['tasks'] of the primary todo tag.
+        """
+        tag = get_primary_tag(user, todo)
+        if tag:
+            return CONFIG['tasks'].index(tag)
+        else:
+            return 99999
+
+    def sort_plan_key(todo):
+        """
+        Extract the planning date for sorting, or a dummy far-future date.
+        """
+        plan_date = get_planning_date(todo)
+        if plan_date:
+            return plan_date
+        else:
+            localtz = get_localzone()
+            far_future_date = datetime.datetime(2999, 12, 31)
+            return localtz.localize(far_future_date)
+
+    # Sort tasks by the task tag
+    todos.sort(key=lambda x: sort_primary_tag(user, x))
+    # Sort tasks by the planned do-date
+    todos.sort(key=sort_plan_key)
+
+    return todos
 
 def main():
     """Main entry point to the command line interface."""

@@ -74,7 +74,7 @@ def deserialize_date(date_str):
 
 
 def make_unambiguous_date_str(datetimeobj):
-    return datetimeobj.strftime('%a %D at %H:%M')
+    return datetimeobj.strftime('%D at %H:%M')
 
 
 def parse_datetime_from_date_str(date_string):
