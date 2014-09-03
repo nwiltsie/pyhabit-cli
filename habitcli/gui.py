@@ -7,20 +7,20 @@ import habitcli
 class ValueStore(object):
     pass
 
+
 class SimpleTableInput(tk.Frame):
-    def __init__(self, parent, data):
+    def __init__(self, parent, hcli, data):
         tk.Frame.__init__(self, parent)
 
+        self.hcli = hcli
         self.data = data
         self.current_data = {}
 
         # Register a command to use for validation
-        vcmd = (self.register(self._validate), "%P")
         val_date = (self.register(self._validate_date), '%P', '%V', '%W', '%v')
-        vcmd2 = (self.register(self.OnValidate),
-                '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        ex_val = (self.register(self.example_validate),
+                  '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
 
-        user = habitcli.get_user()
         # Create the table of widgets
         for row, datum in enumerate(self.data):
             todo_id = datum['id']
@@ -32,15 +32,17 @@ class SimpleTableInput(tk.Frame):
             self.current_data[todo_id].label = label
 
             # Primary tag combobox
-            tag = ttk.Combobox(self, values=habitcli.CONFIG['tasks']+[''], state='readonly')
-            primary_tag = habitcli.get_primary_tag(user, datum) or ""
+            tag = ttk.Combobox(self,
+                               values=hcli.config['tasks']+[''],
+                               state='readonly')
+            primary_tag = hcli.get_primary_tag(datum) or ""
             tag.set(primary_tag)
             tag.grid(row=row, column=1, sticky="nsew")
             tag.todo_id = todo_id
             self.current_data[todo_id].tag = tag
 
             # Planning date entry
-            plan_date = habitcli.get_planning_date(datum)
+            plan_date = hcli.get_planning_date(datum)
             plan_date_str = habitcli.utils.make_unambiguous_date_str(plan_date)
             plan = tk.Entry(self, validate="all", validatecommand=val_date)
             plan.insert(0, plan_date_str)
@@ -50,7 +52,7 @@ class SimpleTableInput(tk.Frame):
 
             # Due date entry
             try:
-                due_date = habitcli.parse_datetime_from_date_str(datum['date'])
+                due_date = habitcli.utils.parse_datetime(datum['date'])
                 due_str = habitcli.utils.make_unambiguous_date_str(due_date)
             except KeyError:
                 due_str = ""
@@ -61,34 +63,45 @@ class SimpleTableInput(tk.Frame):
             self.current_data[todo_id].due = due
 
             # Update button
-            def btn_callback_generator(todo_id, tag, plan, due, old_todo):
+            def btn_callback_generator(todo_id, tag, plan, due, old):
                 def btn_callback():
-                    print todo_id, " updated!"
-                    new_plan_date = habitcli.utils.parse_datetime_from_date_str(plan.get())
-                    new_due_date = habitcli.utils.parse_datetime_from_date_str(due.get())
+                    new_plan_date = habitcli.utils.parse_datetime(plan.get())
+                    new_due_date = habitcli.utils.parse_datetime(due.get())
                     new_tag = tag.get()
                     fragments = []
                     import copy
-                    new_todo = copy.deepcopy(old_todo)
+                    new_todo = copy.deepcopy(old)
 
-                    if new_plan_date != habitcli.get_planning_date(old_todo):
-                        fragments.append("Plan Date: From %s to %s" % (habitcli.get_planning_date(old_todo), new_plan_date))
-                        habitcli.set_planning_date(new_todo, new_plan_date)
-                    old_due_date = habitcli.parse_datetime_from_date_str(old_todo['date']) if hasattr(old_todo, 'date') else None
+                    if new_plan_date != hcli.get_planning_date(old):
+                        fragments.append("Plan Date: From %s to %s" %
+                                         (hcli.get_planning_date(old),
+                                          new_plan_date))
+                        hcli.set_planning_date(new_todo, new_plan_date)
+                    if hasattr(old, 'date'):
+                        old_due_date = hcli.parse_datetime(old['date'])
+                    else:
+                        old_due_date = None
+
                     if new_due_date != old_due_date:
-                        fragments.append("Due Date: From %s to %s" % (old_due_date, new_due_date))
+                        fragments.append("Due Date: From %s to %s" %
+                                         (old_due_date, new_due_date))
                         new_todo['date'] = new_due_date.isoformat()
-                    old_tag = habitcli.get_primary_tag(user, old_todo)
+                    old_tag = hcli.get_primary_tag(old)
                     if new_tag != old_tag:
-                        fragments.append("Tag: From %s to %s" % (old_tag, new_tag))
+                        fragments.append("Tag: From %s to %s" %
+                                         (old_tag, new_tag))
                         print "fixme, tags not working"
                     if fragments:
                         message = "\n".join(fragments)
                         if tkMessageBox.askyesno("Update %s?", message):
-                            pass
+                            print todo_id, " updated!"
                 return btn_callback
 
-            btn = tk.Button(self, text="Update", state='disabled', takefocus=True, highlightbackground="BLUE",
+            btn = tk.Button(self,
+                            text="Update",
+                            state='disabled',
+                            takefocus=True,
+                            highlightbackground="BLUE",
                             command=btn_callback_generator(datum['id'],
                                                            tag,
                                                            plan,
@@ -104,7 +117,7 @@ class SimpleTableInput(tk.Frame):
         # designate a final, empty row to fill up any extra space
         self.grid_rowconfigure(len(self.data), weight=1)
 
-    def OnValidate(self, d, i, P, s, S, v, V, W):
+    def example_validate(self, d, i, P, s, S, v, V, W):
         print "OnValidate:"
         print "d='%s'" % d
         print "i='%s'" % i
@@ -121,44 +134,44 @@ class SimpleTableInput(tk.Frame):
         widget = self.nametowidget(widget)
         if reason in ['focusin', 'key']:
             if hasattr(widget, 'todo_id'):
-                self.current_data[widget.todo_id].btn['state']='disabled'
+                self.current_data[widget.todo_id].btn['state'] = 'disabled'
             return True
         elif reason == 'focusout':
             # Return True if the date parses
             try:
                 if value:
-                    dt = habitcli.parse_datetime_from_date_str(value)
-                    widget.delete(0,1000)
-                    widget.insert(0, habitcli.utils.make_unambiguous_date_str(dt))
-                self.current_data[widget.todo_id].btn['state']='active'
-                widget.after_idle(widget.config, {'validate':validation})
+                    dt = habitcli.utils.parse_datetime(value)
+                    widget.delete(0, 1000)
+                    widget.insert(0,
+                                  habitcli.utils.make_unambiguous_date_str(dt))
+                self.current_data[widget.todo_id].btn['state'] = 'active'
+                widget.after_idle(widget.config, {'validate': validation})
                 return True
-            except habitcli.utils.DateParseException as e:
-                print "Invalid date entry," , value, ", deleting..."
-                widget.delete(0,1000)
-                widget.after_idle(widget.config, {'validate':validation})
+            except habitcli.utils.DateParseException:
+                print "Invalid date entry,", value, ", deleting..."
+                widget.delete(0, 1000)
+                widget.after_idle(widget.config, {'validate': validation})
                 return False
         # Return True for all other reasons
         else:
             return True
 
-    def _validate(self, P):
-        '''Perform input validation.
-        '''
-        return True
 
-class Example(tk.Frame):
-    def __init__(self, parent, data):
+class TodoFrame(tk.Frame):
+    def __init__(self, parent, hcli, data):
         tk.Frame.__init__(self, parent)
-        self.table = SimpleTableInput(self, data)
+        self.table = SimpleTableInput(self, hcli, data)
         self.table.pack(side="top", fill="both", expand=True)
 
 
-user = habitcli.get_user()
-todos = [t for t in user['todos'] if 'completed' in t.keys()]
-todos = [t for t in todos if not t['completed']]
-todos = habitcli._nice_sort(todos, user)
+if __name__ == '__main__':
 
-root = tk.Tk()
-Example(root, todos).pack(side="top", fill="both", expand=True)
-root.mainloop()
+    hcli = habitcli.HabitCLI()
+    user = hcli.get_user()
+    todos = [t for t in user['todos'] if 'completed' in t.keys()]
+    todos = [t for t in todos if not t['completed']]
+    todos = hcli._nice_sort(todos)
+
+    root = tk.Tk()
+    TodoFrame(root, hcli, todos).pack(side="top", fill="both", expand=True)
+    root.mainloop()

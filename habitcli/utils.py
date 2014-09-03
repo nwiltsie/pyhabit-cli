@@ -90,7 +90,7 @@ def make_unambiguous_date_str(datetimeobj):
     return datetimeobj.strftime('%D at %H:%M')
 
 
-def parse_datetime_from_date_str(date_string):
+def parse_datetime(date_string):
     """Parse a timetime object from a natural language string."""
     cal = Calendar()
     unaware_dt = cal.nlp(date_string)

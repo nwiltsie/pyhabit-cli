@@ -23,7 +23,7 @@ from fuzzywuzzy import process
 import habitcli.pretty as pretty
 from pyhabit import HabitAPI
 from habitcli.utils import confirm, serialize_date, deserialize_date
-from habitcli.utils import parse_datetime_from_date_str, read_config
+from habitcli.utils import parse_datetime, read_config
 from habitcli.utils import get_default_config_filename, save_user, load_user
 
 
@@ -273,11 +273,11 @@ class HabitCLI(object):
         due_date_obj = None
         # Process the input date string into a datetime
         if due_date:
-            due_date_obj = parse_datetime_from_date_str(due_date).isoformat()
+            due_date_obj = parse_datetime(due_date).isoformat()
 
         note = None
         if plan_date:
-            plan_date_obj = parse_datetime_from_date_str(plan_date)
+            plan_date_obj = parse_datetime(plan_date)
             note = self.set_planning_date({'notes': ''},
                                           plan_date_obj)['notes']
 
@@ -362,7 +362,7 @@ class HabitCLI(object):
     def update_todo_plan_date(self, todo, planned_date):
         """Set the planning date for a task, selected by natural language."""
         selected_todo = self.match_todo_by_string(todo)['todo']
-        parsed_date = parse_datetime_from_date_str(planned_date)
+        parsed_date = parse_datetime(planned_date)
         print "Change do-date of '%s' to %s?" % (selected_todo['text'],
                                                  pretty.date(parsed_date))
         if confirm(resp=True):
