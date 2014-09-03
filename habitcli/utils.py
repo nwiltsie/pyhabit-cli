@@ -66,6 +66,10 @@ def deserialize_date(date_str):
     return yaml.load(date_str)
 
 
+def make_unambiguous_date_str(datetimeobj):
+    return datetimeobj.strftime('%a %D at %H:%M')
+
+
 def parse_datetime_from_date_str(date_string):
     """Parse a timetime object from a natural language string."""
     cal = Calendar()
@@ -146,3 +150,11 @@ def write_default_config_file(config_filename=None):
     config.set('HabitRPG', 'tasks', 'morning,afternoon,evening')
     with open(config_filename, 'wb') as config_file:
         config.write(config_file)
+
+
+def _get_incomplete_todos():
+    import habitcli
+    user = habitcli.get_user()
+    todos = [t for t in user['todos'] if 'completed' in t.keys()]
+    todos = [t for t in todos if not t['completed']]
+    return todos
