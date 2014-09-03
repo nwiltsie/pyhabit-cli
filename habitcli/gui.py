@@ -1,6 +1,10 @@
+# Standard lib imports
+import copy
 import Tkinter as tk
 import tkMessageBox
 import ttk
+
+# Same-project imports
 import habitcli
 
 
@@ -69,7 +73,6 @@ class SimpleTableInput(tk.Frame):
                     new_due_date = habitcli.utils.parse_datetime(due.get())
                     new_tag = tag.get()
                     fragments = []
-                    import copy
                     new_todo = copy.deepcopy(old)
 
                     if new_plan_date != hcli.get_planning_date(old):
@@ -77,20 +80,19 @@ class SimpleTableInput(tk.Frame):
                                          (hcli.get_planning_date(old),
                                           new_plan_date))
                         hcli.set_planning_date(new_todo, new_plan_date)
-                    if hasattr(old, 'date'):
-                        old_due_date = hcli.parse_datetime(old['date'])
-                    else:
-                        old_due_date = None
 
-                    if new_due_date != old_due_date:
+                    if new_due_date != hcli.get_due_date(old):
                         fragments.append("Due Date: From %s to %s" %
-                                         (old_due_date, new_due_date))
-                        new_todo['date'] = new_due_date.isoformat()
+                                         (hcli.get_due_date(old),
+                                          new_due_date))
+                        self.hcli.set_due_date(new_todo, new_due_date)
+
                     old_tag = hcli.get_primary_tag(old)
                     if new_tag != old_tag:
                         fragments.append("Tag: From %s to %s" %
                                          (old_tag, new_tag))
                         print "fixme, tags not working"
+
                     if fragments:
                         message = "\n".join(fragments)
                         if tkMessageBox.askyesno("Update %s?", message):
