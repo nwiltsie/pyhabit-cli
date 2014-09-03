@@ -10,6 +10,13 @@ from parsedatetime import Calendar
 from tzlocal import get_localzone
 
 
+class DateParseException(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
+
 # http://code.activestate.com/recipes/541096-prompt-the-user-for-confirmation/
 def confirm(prompt=None, resp=False):
     """Prompts for yes or no response from the user. Returns True for yes and
@@ -75,7 +82,7 @@ def parse_datetime_from_date_str(date_string):
     cal = Calendar()
     unaware_dt = cal.nlp(date_string)
     if not unaware_dt:
-        raise Exception("Due date %s unclear" % date_string)
+        raise DateParseException("Due date '%s' unclear" % date_string)
     else:
         code = unaware_dt[0][1]
         unaware_dt = unaware_dt[0][0]
