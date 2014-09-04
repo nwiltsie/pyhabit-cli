@@ -24,32 +24,10 @@ from fuzzywuzzy import process
 import habitcli.gui
 import habitcli.pretty as pretty
 from pyhabit import HabitAPI
+from habitcli.exceptions import MultipleTasksException, NoSuchTagException
 from habitcli.utils import confirm, serialize_date, deserialize_date
 from habitcli.utils import parse_datetime, read_config
 from habitcli.utils import get_default_config_filename, save_user, load_user
-
-
-class NoSuchTagException(Exception):
-    """Exception to designate missing tags."""
-    def __init__(self, tag, valid_tags):
-        Exception.__init__(self)
-        self.tag = tag
-        self.tag = valid_tags
-
-    def __str__(self):
-        return "Tag '%s' does not exist" % self.value
-
-
-class MultipleTasksException(Exception):
-    """Exception for when multiple primary tags are assigned to a todo."""
-    def __init__(self, todo, *tags):
-        Exception.__init__(self)
-        self.todo = todo
-        self.tags = tags
-
-    def __str__(self):
-        return "Todo '%s' has multiple tasks: %s" % \
-            (self.todo['id'], self.tags)
 
 
 class Todo(collections.MutableMapping):

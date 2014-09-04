@@ -11,28 +11,10 @@ import yaml
 from parsedatetime import Calendar
 from tzlocal import get_localzone
 
+from habitcli.exceptions import DateParseException, DateFormatException
+
 
 CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
-
-
-class DateParseException(Exception):
-    """Exception for date parsing."""
-    def __init__(self, value):
-        Exception.__init__(self)
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
-
-
-class DateFormatException(Exception):
-    """Exception for date formatting."""
-    def __init__(self, value):
-        Exception.__init__(self)
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
 
 
 # http://code.activestate.com/recipes/541096-prompt-the-user-for-confirmation/
