@@ -7,7 +7,7 @@ import ttk
 
 # Same-project imports
 import habitcli
-from habitcli.utils import format_date, parse_datetime
+import habitcli.utils as utils
 
 
 class ValueStore(object):
@@ -72,7 +72,7 @@ class SimpleTableInput(tk.Frame):
     def _add_plan_field(self, datum, row):
         """Add a plan date field for the given todo."""
         plan_date = self.hcli.get_planning_date(datum)
-        plan_date_str = format_date(plan_date)
+        plan_date_str = utils.format_date(plan_date)
         plan = tk.Entry(self, validate="all", validatecommand=self.val_date)
         plan.insert(0, plan_date_str)
         plan.grid(row=row, column=2, sticky="nsew")
@@ -83,7 +83,7 @@ class SimpleTableInput(tk.Frame):
     def _add_due_field(self, datum, row):
         """Add a due date field for the given todo."""
         due_date = self.hcli.get_due_date(datum)
-        due_str = format_date(due_date)
+        due_str = utils.format_date(due_date)
         due = tk.Entry(self, validate="all", validatecommand=self.val_date)
         due.insert(0, due_str)
         due.grid(row=row, column=3, sticky="nsew")
@@ -108,23 +108,23 @@ class SimpleTableInput(tk.Frame):
                 # Changes in planning date
                 if refs.plan.get():
                     old_plan = self.hcli.get_planning_date(refs.old)
-                    new_plan = parse_datetime(refs.plan.get())
+                    new_plan = utils.parse_datetime(refs.plan.get())
                     if new_plan != old_plan:
                         fragments.append(date_fmt_str %
                                          ('Plan Date',
-                                          format_date(old_plan),
-                                          format_date(new_plan)))
+                                          utils.format_date(old_plan),
+                                          utils.format_date(new_plan)))
                         self.hcli.set_planning_date(new_todo, new_plan)
 
                 # Changes in due date
                 if refs.due.get():
                     old_due = self.hcli.get_due_date(refs.old)
-                    new_due = parse_datetime(refs.due.get())
+                    new_due = utils.parse_datetime(refs.due.get())
                     if new_due != old_due:
                         fragments.append(date_fmt_str %
                                          ('Due Date',
-                                          format_date(old_due),
-                                          format_date(new_due)))
+                                          utils.format_date(old_due),
+                                          utils.format_date(new_due)))
                         self.hcli.set_due_date(new_todo, new_due)
 
                 # Changes in tag
@@ -192,10 +192,10 @@ class SimpleTableInput(tk.Frame):
             # Return True if the date parses
             try:
                 if value:
-                    dt = parse_datetime(value)
+                    dt = utils.parse_datetime(value)
                     widget.delete(0, 1000)
                     widget.insert(0,
-                                  format_date(dt))
+                                  utils.format_date(dt))
                 self.current_data[widget.todo_id].btn['state'] = 'active'
                 widget.after_idle(widget.config, {'validate': validation})
                 return True

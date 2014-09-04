@@ -4,6 +4,7 @@ A command line interface to HabitRPG.
 """
 
 # Standard library imports
+import collections
 import datetime
 import sys
 import textwrap
@@ -20,6 +21,7 @@ from requests import ConnectionError
 from fuzzywuzzy import process
 
 # Same-project imports
+import habitcli.gui
 import habitcli.pretty as pretty
 from pyhabit import HabitAPI
 from habitcli.utils import confirm, serialize_date, deserialize_date
@@ -48,6 +50,85 @@ class MultipleTasksException(Exception):
     def __str__(self):
         return "Todo '%s' has multiple tasks: %s" % \
             (self.todo['id'], self.tags)
+
+
+class Todo(collections.MutableMapping):
+    """A dictionary that applies an arbitrary key-altering
+       function before accessing the keys"""
+
+    def __init__(self, *args, **kwargs):
+        self.hcli = kwargs.pop('hcli', None)
+        self.store = dict(*args, **kwargs)
+
+    def __getitem__(self, key):
+        return self.store[key]
+
+    def __setitem__(self, key, value):
+        self.store[key] = value
+
+    def __delitem__(self, key):
+        del self.store[key]
+
+    def __iter__(self):
+        return iter(self.store)
+
+    def __len__(self):
+        return len(self.store)
+
+    def __str__(self):
+        return "(Todo) ID:'%s' Text:'%s'" % \
+            (self.get('id', None), self.get('text', ''))
+
+    def get_planning_date(self):
+        """Extract the planning due date string from the task."""
+        planned_date = deserialize_date(self['notes'])
+
+        if planned_date:
+            return planned_date
+        else:
+            return None
+
+    def set_planning_date(self, plan_date, update=False):
+        """
+        Set the planning due date.
+        Wipes out the current 'notes' field.
+        Returns the updated todo.
+        """
+        self['notes'] = serialize_date(plan_date)
+        if update:
+            self._update()
+
+    def get_due_date(self):
+        """Extract the due date from the task as a datetime."""
+        if 'date' in self.keys() and self['date']:
+            return dateutil.parser.parse(self['date'])
+        elif 'dateCompleted' in self.keys() and self['dateCompleted']:
+            return dateutil.parser.parse(self['dateCompleted'])
+        else:
+            return None
+
+    def set_due_date(self, due_date, update=False):
+        """Set the due date."""
+        self['date'] = due_date.isoformat()
+        if update:
+            self._update()
+
+    def has_tags(self, tags):
+        """
+        Returns the subset of 'tags' that are applied to the todo.
+
+        Tags are specified by ID, not by nice string name.
+        """
+        return list(set(tags) & set(self['tags'].keys()))
+
+    def _update(self):
+        """
+        Call the HabitRPG API to update self, then replace self with the
+        returned values.
+        """
+        updated_self = self.hcli.update_todo(self)
+        self.clear()
+        self.update(updated_self)
 
 
 class HabitCLI(object):
@@ -85,6 +166,10 @@ class HabitCLI(object):
                 (self.user['err'], get_default_config_filename())
             sys.exit(1)
 
+        # Replace user['todos'] with todo objects
+        for index, todo in enumerate(self.user['todos']):
+            self.user['todos'][index] = Todo(todo, hcli=self)
+
         # Add tag dictionaries to the user object
         tag_dict = defaultdict(lambda: "+missingtag")
         reverse_tag_dict = defaultdict(unicode)
@@ -106,44 +191,6 @@ class HabitCLI(object):
         self.user['color_dict'] = color_dict
         return self.user
 
-    def get_planning_date(self, todo):
-        """Extract the planning due date string from the task."""
-        planned_date = deserialize_date(todo['notes'])
-
-        if planned_date:
-            return planned_date
-        else:
-            return None
-
-    def set_planning_date(self, todo, plan_date, update=False):
-        """
-        Set the planning due date.
-        Wipes out the current 'notes' field.
-        Returns the updated todo.
-        """
-        todo['notes'] = serialize_date(plan_date)
-        if update:
-            return self.update_todo(todo)
-        else:
-            return todo
-
-    def get_due_date(self, todo):
-        """Extract the due date from the task as a datetime."""
-        if 'date' in todo.keys() and todo['date']:
-            return dateutil.parser.parse(todo['date'])
-        elif 'dateCompleted' in todo.keys() and todo['dateCompleted']:
-            return dateutil.parser.parse(todo['dateCompleted'])
-        else:
-            return None
-
-    def set_due_date(self, todo, due_date, update=False):
-        """Set the due date."""
-        todo['date'] = due_date.isoformat()
-        if update:
-            return self.update_todo(todo)
-        else:
-            return todo
-
     def get_todo_str(self,
                      todo,
                      date=False,
@@ -155,7 +202,7 @@ class HabitCLI(object):
         # If dates should be printed, add the planning and drop-dead dates
         if date:
             plan_date = ""
-            plan_date_obj = self.get_planning_date(todo)
+            plan_date_obj = todo.get_planning_date()
             if plan_date_obj:
                 plan_date = pretty.date(plan_date_obj)
 
@@ -184,7 +231,7 @@ class HabitCLI(object):
 
         return todo_str
 
-    def print_change(self, response):
+    def _print_change(self, response):
         """Print the stat change expressed in the response."""
         old_exp = self.user['stats']['exp']
         old_hp = self.user['stats']['hp']
@@ -226,7 +273,7 @@ class HabitCLI(object):
         if tags:
             tag_ids = [self.user['reverse_tag_dict'][t.replace("+", "")]
                        for t in tags]
-            todos = [todo for todo in todos if self._has_tags(todo, tag_ids)]
+            todos = [todo for todo in todos if todo.has_tags(tag_ids)]
 
         # Print the raw json data
         if raw:
@@ -244,7 +291,7 @@ class HabitCLI(object):
             """
             Extract a pretty date, with all past dates listed 'OVERDUE'.
             """
-            plan_date = self.get_planning_date(todo)
+            plan_date = todo.get_planning_date()
             if plan_date:
                 if plan_date.date() < datetime.datetime.now().date():
                     return "OVERDUE"
@@ -311,15 +358,16 @@ class HabitCLI(object):
 
         due_date_obj = None
         # Process the input date string into a datetime
+        new_todo = Todo()
         if due_date:
-            due_date_obj = self.set_due_date({},
-                                             parse_datetime(due_date))['date']
+            new_todo.set_due_date(parse_datetime(due_date))
+            due_date_obj = new_todo['date']
 
         note = None
         if plan_date:
             plan_date_obj = parse_datetime(plan_date)
-            note = self.set_planning_date({'notes': ''},
-                                          plan_date_obj)['notes']
+            new_todo.set_planning_date(plan_date_obj)
+            note = new_todo['notes']
 
         self.api.create_task(self.api.TYPE_TODO, todo, date=due_date_obj,
                              tags=added_tags, notes=note)
@@ -330,7 +378,7 @@ class HabitCLI(object):
         todo = self.match_todo_by_string(todo_string)['todo']
         print self.get_todo_str(todo, date=True, notes=True)
 
-    def match_todo_by_string(self, todo_string, match_checklist=False):
+    def match_todo_by_string(self, todo_string):
         """
         Returns the best match from all the user's incomplete tasks.
 
@@ -431,7 +479,7 @@ class HabitCLI(object):
         print "Change do-date of '%s' to %s?" % (selected_todo['text'],
                                                  pretty.date(parsed_date))
         if confirm(resp=True):
-            self.set_planning_date(selected_todo, parsed_date, self.api)
+            selected_todo.set_planning_date(parsed_date, update=True)
 
     @named('delete')
     def delete_todo(self, *todos):
@@ -448,8 +496,7 @@ class HabitCLI(object):
         """Complete a task selected by natural language with a confirmation."""
         todo_string = " ".join(todos)
 
-        selected_todo = self.match_todo_by_string(todo_string,
-                                                  match_checklist=True)
+        selected_todo = self.match_todo_by_string(todo_string)
 
         print selected_todo['todo']['text']
         if confirm(resp=True):
@@ -468,7 +515,7 @@ class HabitCLI(object):
             else:
                 response = self.api.perform_task(selected_todo['todo']['id'],
                                                  self.api.DIRECTION_UP)
-                self.print_change(response)
+                self._print_change(response)
 
     def sort_nicely(self, todos):
         """Sort the todos by date and task."""
@@ -486,7 +533,7 @@ class HabitCLI(object):
             """
             Extract the planning date for sorting, or a dummy far-future date.
             """
-            plan_date = self.get_planning_date(todo)
+            plan_date = todo.get_planning_date()
             if plan_date:
                 return plan_date
             else:
@@ -498,7 +545,7 @@ class HabitCLI(object):
             """
             Extract the due date for sorting, or a dummy far-future date.
             """
-            due_date = self.get_due_date(todo)
+            due_date = todo.get_due_date()
             if due_date:
                 return due_date
             else:
@@ -514,9 +561,21 @@ class HabitCLI(object):
 
         return todos
 
-    def _has_tags(self, todo, tags):
-        """Returns the subset of 'tags' that are applied to the todo."""
-        return list(set(tags) & set(todo['tags'].keys()))
+    @named('gui')
+    def launch_graphical_window(self, *tags):
+        """
+        Launch a graphical window to edit the tasks, optionally limited to
+        those defined by the given tags.
+        """
+        todos = [t for t in self.user['todos']
+                 if 'completed' in t.keys() and not t['completed']]
+        if tags:
+            tag_ids = [self.user['reverse_tag_dict'][t.replace("+", "")]
+                       for t in tags]
+            todos = [todo for todo in todos if todo.has_tags(tag_ids)]
+
+        todos = self.sort_nicely(todos)
+        habitcli.gui.make_gui(self, todos)
 
 
 def main():
@@ -532,7 +591,8 @@ def main():
                               hcli.delete_todo,
                               hcli.complete_todo,
                               hcli.print_detailed_string,
-                              hcli.update_todo_plan_date])
+                              hcli.update_todo_plan_date,
+                              hcli.launch_graphical_window])
     argh_parser.dispatch()
 
 if __name__ == "__main__":
