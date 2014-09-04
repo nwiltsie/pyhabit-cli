@@ -59,7 +59,7 @@ class Todo(collections.MutableMapping):
     def __init__(self, *args, **kwargs):
         self.hcli = kwargs.pop('hcli', None)
         self.store = dict(*args, **kwargs)
-        if not 'tags' in self:
+        if 'tags' not in self:
             self['tags'] = {}
 
     def __getitem__(self, key):
@@ -112,6 +112,40 @@ class Todo(collections.MutableMapping):
     def set_due_date(self, due_date, update=False):
         """Set the due date."""
         self['date'] = due_date.isoformat()
+        if update:
+            self.update_db()
+
+    def get_primary_tag(self):
+        """
+        Get the primary tag of a todo. Each todo should have a single task tag,
+        although it may have further decorative tags.
+        """
+        tag_strs = [self.hcli.get_user()['tag_dict'][t]
+                    for t in self['tags'].keys()
+                    if self['tags'][t]]
+
+        primary_tags = list(set(tag_strs) & set(self.hcli.config['tasks']))
+
+        if len(primary_tags) > 1:
+            raise MultipleTasksException(self['id'], primary_tags)
+
+        if primary_tags:
+            return primary_tags[0]
+        else:
+            return None
+
+    def set_primary_tag(self, tag, update=False):
+        """
+        Set the primary tag of a todo. This will unset any other primary tags
+        currently applied.
+        """
+        for task_id in [self.hcli.get_user()['reverse_tag_dict'][t]
+                        for t in self.hcli.config['tasks']]:
+            if self['tags'].get([task_id]):
+                self['tags'][task_id] = False
+
+        self['tags'][self.hcli.get_user()['reverse_tag_dict'][tag]] = True
+
         if update:
             self.update_db()
 
@@ -337,7 +371,7 @@ class HabitCLI(object):
             print "%s:" % plan_date
 
             for tag, tagtodos in groupby(grouped_todos,
-                                         self.get_primary_tag):
+                                         Todo.get_primary_tag):
                 color = self.user['color_dict'][tag]
                 for todo in tagtodos:
                     print "\t", color(self.get_todo_str(todo))
@@ -437,42 +471,6 @@ class HabitCLI(object):
 
         return selected_todo
 
-    def get_primary_tag(self, todo):
-        """
-        Get the primary tag of a todo. Each todo should have a single task tag,
-        although it may have further decorative tags.
-        """
-        tag_strs = [self.user['tag_dict'][t]
-                    for t in todo['tags'].keys()
-                    if todo['tags'][t]]
-
-        primary_tags = list(set(tag_strs) & set(self.config['tasks']))
-
-        if len(primary_tags) > 1:
-            raise MultipleTasksException(todo['id'], primary_tags)
-
-        if primary_tags:
-            return primary_tags[0]
-        else:
-            return None
-
-    def set_primary_tag(self, todo, tag, update=False):
-        """
-        Set the primary tag of a todo. This will unset any other primary tags
-        currently applied.
-
-        Returns the updated task.
-        """
-        for task_id in [self.user['reverse_tag_dict'][t]
-                        for t in self.config['tasks']]:
-            if task_id in todo['tags'].keys() and todo['tags'][task_id]:
-                todo['tags'][task_id] = False
-
-        todo['tags'][self.user['reverse_tag_dict'][tag]] = True
-
-        if update:
-            self.update_todo(todo)
-
     @named('addcheck')
     def add_checklist_item(self, check, parent_str):
         """Add a checklist item to a todo matched by natural language."""
@@ -541,7 +539,7 @@ class HabitCLI(object):
             """
             Return the list index in self.config['tasks'] of the primary tag.
             """
-            tag = self.get_primary_tag(todo)
+            tag = todo.get_primary_tag()
             if tag:
                 return self.config['tasks'].index(tag)
             else:

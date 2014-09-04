@@ -114,9 +114,10 @@ def parse_datetime(date_string):
         unaware_dt = unaware_dt[0][0]
         # If no time is supplied, assume 6pm
         if code == 1:
-            unaware_dt = unaware_dt.replace(hour=18)
-            unaware_dt = unaware_dt.replace(minute=0)
-            unaware_dt = unaware_dt.replace(second=0)
+            unaware_dt = unaware_dt.replace(hour=18,
+                                            minute=0,
+                                            second=0,
+                                            microsecond=0)
     if os.environ.get('HABIT_TZ'):
         localtz = pytz.timezone(os.environ.get('HABIT_TZ'))
     else:
