@@ -86,8 +86,11 @@ def deserialize_date(date_str):
     return yaml.load(date_str)
 
 
-def make_unambiguous_date_str(datetimeobj):
-    return datetimeobj.strftime('%D at %H:%M')
+def format_date(datetimeobj):
+    if datetimeobj:
+        return datetimeobj.strftime('%D at %H:%M')
+    else:
+        return ""
 
 
 def parse_datetime(date_string):

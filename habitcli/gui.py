@@ -6,6 +6,7 @@ import ttk
 
 # Same-project imports
 import habitcli
+from habitcli.utils import format_date, parse_datetime
 
 
 class ValueStore(object):
@@ -29,6 +30,7 @@ class SimpleTableInput(tk.Frame):
         for row, datum in enumerate(self.data):
             todo_id = datum['id']
             self.current_data[todo_id] = ValueStore()
+            self.current_data[todo_id].old = datum
 
             # Label
             label = tk.Label(self, text=datum['text'])
@@ -37,17 +39,17 @@ class SimpleTableInput(tk.Frame):
 
             # Primary tag combobox
             tag = ttk.Combobox(self,
-                               values=hcli.config['tasks']+[''],
+                               values=self.hcli.config['tasks']+[''],
                                state='readonly')
-            primary_tag = hcli.get_primary_tag(datum) or ""
+            primary_tag = self.hcli.get_primary_tag(datum) or ""
             tag.set(primary_tag)
             tag.grid(row=row, column=1, sticky="nsew")
             tag.todo_id = todo_id
             self.current_data[todo_id].tag = tag
 
             # Planning date entry
-            plan_date = hcli.get_planning_date(datum)
-            plan_date_str = habitcli.utils.make_unambiguous_date_str(plan_date)
+            plan_date = self.hcli.get_planning_date(datum)
+            plan_date_str = format_date(plan_date)
             plan = tk.Entry(self, validate="all", validatecommand=val_date)
             plan.insert(0, plan_date_str)
             plan.grid(row=row, column=2, sticky="nsew")
@@ -55,11 +57,8 @@ class SimpleTableInput(tk.Frame):
             self.current_data[todo_id].plan = plan
 
             # Due date entry
-            try:
-                due_date = habitcli.utils.parse_datetime(datum['date'])
-                due_str = habitcli.utils.make_unambiguous_date_str(due_date)
-            except KeyError:
-                due_str = ""
+            due_date = hcli.get_due_date(datum)
+            due_str = format_date(due_date)
             due = tk.Entry(self, validate="all", validatecommand=val_date)
             due.insert(0, due_str)
             due.grid(row=row, column=3, sticky="nsew")
@@ -67,36 +66,60 @@ class SimpleTableInput(tk.Frame):
             self.current_data[todo_id].due = due
 
             # Update button
-            def btn_callback_generator(todo_id, tag, plan, due, old):
+            def btn_callback_generator(todo_id):
                 def btn_callback():
-                    new_plan_date = habitcli.utils.parse_datetime(plan.get())
-                    new_due_date = habitcli.utils.parse_datetime(due.get())
-                    new_tag = tag.get()
+                    refs = self.current_data[todo_id]
+
+                    new_tag = refs.tag.get()
                     fragments = []
-                    new_todo = copy.deepcopy(old)
+                    new_todo = copy.deepcopy(refs.old)
 
-                    if new_plan_date != hcli.get_planning_date(old):
-                        fragments.append("Plan Date: From %s to %s" %
-                                         (hcli.get_planning_date(old),
-                                          new_plan_date))
-                        hcli.set_planning_date(new_todo, new_plan_date)
+                    date_fmt_str = "%s:\n\tFrom: %s\n\tTo:     %s"
 
-                    if new_due_date != hcli.get_due_date(old):
-                        fragments.append("Due Date: From %s to %s" %
-                                         (hcli.get_due_date(old),
-                                          new_due_date))
-                        self.hcli.set_due_date(new_todo, new_due_date)
+                    # Changes in planning date
+                    if refs.plan.get():
+                        old_plan = self.hcli.get_planning_date(refs.old)
+                        new_plan = parse_datetime(refs.plan.get())
+                        if new_plan != old_plan:
+                            fragments.append(date_fmt_str %
+                                             ('Plan Date',
+                                              format_date(old_plan),
+                                              format_date(new_plan)))
+                            self.hcli.set_planning_date(new_todo, new_plan)
 
-                    old_tag = hcli.get_primary_tag(old)
+                    # Changes in due date
+                    if refs.due.get():
+                        old_due = self.hcli.get_due_date(refs.old)
+                        new_due = parse_datetime(refs.due.get())
+                        if new_due != old_due:
+                            fragments.append(date_fmt_str %
+                                             ('Due Date',
+                                              format_date(old_due),
+                                              format_date(new_due)))
+                            self.hcli.set_due_date(new_todo, new_due)
+
+                    # Changes in tag
+                    old_tag = self.hcli.get_primary_tag(refs.old)
                     if new_tag != old_tag:
-                        fragments.append("Tag: From %s to %s" %
+                        fragments.append("Tag:\n\tFrom: %s\n\tTo: %s" %
                                          (old_tag, new_tag))
-                        print "fixme, tags not working"
+                        hcli.set_primary_tag(new_todo, new_tag)
 
                     if fragments:
                         message = "\n".join(fragments)
-                        if tkMessageBox.askyesno("Update %s?", message):
-                            print todo_id, " updated!"
+                        if tkMessageBox.askyesno("Update %s?" %
+                                                 new_todo['text'], message):
+                            print new_todo['text'], " updated!"
+
+                            self.hcli.update_todo(new_todo)
+
+                            # Disable everything
+                            refs.label['state'] = 'disabled'
+                            refs.tag['state'] = 'disabled'
+                            refs.plan['state'] = 'disabled'
+                            refs.due['state'] = 'disabled'
+                            refs.btn['state'] = 'disabled'
+
                 return btn_callback
 
             btn = tk.Button(self,
@@ -104,11 +127,7 @@ class SimpleTableInput(tk.Frame):
                             state='disabled',
                             takefocus=True,
                             highlightbackground="BLUE",
-                            command=btn_callback_generator(datum['id'],
-                                                           tag,
-                                                           plan,
-                                                           due,
-                                                           datum))
+                            command=btn_callback_generator(datum['id']))
             btn.grid(row=row, column=4, sticky="nsew")
             btn.todo_id = todo_id
             self.current_data[todo_id].btn = btn
@@ -142,10 +161,10 @@ class SimpleTableInput(tk.Frame):
             # Return True if the date parses
             try:
                 if value:
-                    dt = habitcli.utils.parse_datetime(value)
+                    dt = parse_datetime(value)
                     widget.delete(0, 1000)
                     widget.insert(0,
-                                  habitcli.utils.make_unambiguous_date_str(dt))
+                                  format_date(dt))
                 self.current_data[widget.todo_id].btn['state'] = 'active'
                 widget.after_idle(widget.config, {'validate': validation})
                 return True

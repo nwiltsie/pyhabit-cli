@@ -91,30 +91,30 @@ class HabitCLI(object):
         else:
             return None
 
-    def set_planning_date(self, todo, plan_date, api=None):
+    def set_planning_date(self, todo, plan_date, update=False):
         """
         Set the planning due date.
         Wipes out the current 'notes' field.
         Returns the updated todo.
         """
         todo['notes'] = serialize_date(plan_date)
-        if api:
-            return api.update_task(todo['id'], todo)
+        if update:
+            return self.update_todo(todo)
         else:
             return todo
 
     def get_due_date(self, todo):
         """Extract the due date from the task as a datetime."""
-        if hasattr(todo, 'date'):
-            return parse_datetime(todo['date'])
+        if 'date' in todo.keys():
+            return dateutil.parser.parse(todo['date'])
         else:
             return None
 
-    def set_due_date(self, todo, due_date, api=None):
+    def set_due_date(self, todo, due_date, update=False):
         """Set the due date."""
         todo['date'] = due_date.isoformat()
-        if api:
-            return api.update_task(todo['id'], todo)
+        if update:
+            return self.update_todo(todo)
         else:
             return todo
 
@@ -304,7 +304,7 @@ class HabitCLI(object):
     def print_detailed_string(self, todo_string):
         """Print a detailed description of the described todo."""
         todo = self.match_todo_by_string(todo_string)['todo']
-        print self.get_todo_str(todo, notes=True)
+        print self.get_todo_str(todo, date=True, notes=True)
 
     def match_todo_by_string(self, todo_string, match_checklist=False):
         """
@@ -357,6 +357,25 @@ class HabitCLI(object):
         else:
             return None
 
+    def set_primary_tag(self, todo, tag, update=False):
+        """
+        Set the primary tag of a todo. This will unset any other primary tags
+        currently applied.
+
+        Returns the updated task.
+        """
+        for task_id in [self.user['reverse_tag_dict'][t]
+                        for t in self.config['tasks']]:
+            if task_id in todo['tags'].keys() and todo['tags'][task_id]:
+                todo['tags'][task_id] = False
+
+        todo['tags'][self.user['reverse_tag_dict'][tag]] = True
+
+        if update:
+            return self.update_todo(todo)
+        else:
+            return todo
+
     @named('addcheck')
     def add_checklist_item(self, check, parent_str):
         """Add a checklist item to a todo matched by natural language."""
@@ -371,8 +390,12 @@ class HabitCLI(object):
                 if 'checklist' not in parent.keys():
                     parent['checklist'] = []
                 parent['checklist'].append({'text': check, 'completed': False})
-                response = self.api.update_task(parent['id'], parent)
+                response = self.update_todo(parent)
                 print self.get_todo_str(response, completed_faint=True)
+
+    def update_todo(self, todo):
+        """Wrapper for the pyhabit update_task function."""
+        return self.api.update_task(todo['id'], todo)
 
     @named('plan')
     def update_todo_plan_date(self, todo, planned_date):
@@ -411,7 +434,7 @@ class HabitCLI(object):
                 # Mark the checklist item as complete and repost
                 check_index = selected_todo['check_index']
                 parent['checklist'][check_index]['completed'] = True
-                response = self.api.update_task(parent['id'], parent)
+                response = self.update_todo(parent)
                 # Print the remaining sections of the task
                 print self.get_todo_str(response, completed_faint=True)
 
@@ -445,8 +468,21 @@ class HabitCLI(object):
                 far_future_date = datetime.datetime(2999, 12, 31)
                 return localtz.localize(far_future_date)
 
+        def sort_due_key(todo):
+            """
+            Extract the due date for sorting, or a dummy far-future date.
+            """
+            due_date = self.get_due_date(todo)
+            if due_date:
+                return due_date
+            else:
+                localtz = get_localzone()
+                far_future_date = datetime.datetime(2999, 12, 31)
+                return localtz.localize(far_future_date)
+
         # Sort tasks by the task tag
         todos.sort(key=sort_primary_tag)
+        todos.sort(key=sort_due_key)
         # Sort tasks by the planned do-date
         todos.sort(key=sort_plan_key)
 
