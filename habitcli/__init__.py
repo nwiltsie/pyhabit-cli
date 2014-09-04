@@ -59,6 +59,8 @@ class Todo(collections.MutableMapping):
     def __init__(self, *args, **kwargs):
         self.hcli = kwargs.pop('hcli', None)
         self.store = dict(*args, **kwargs)
+        if not 'tags' in self:
+            self['tags'] = {}
 
     def __getitem__(self, key):
         return self.store[key]
@@ -121,14 +123,40 @@ class Todo(collections.MutableMapping):
         """
         return list(set(tags) & set(self['tags'].keys()))
 
+    def _update(self, updated_self):
+        """
+        Used after interactions with the API to update the stored todo details.
+        """
+        self.clear()
+        self.update(updated_self)
+
     def update_db(self):
         """
         Call the HabitRPG API to update self, then replace self with the
         returned values.
         """
         updated_self = self.hcli.api.update_task(self['id'], dict(self))
-        self.clear()
-        self.update(updated_self)
+        self._update(updated_self)
+
+    def complete(self):
+        """
+        Call the HabitRPG API to mark self as completed.
+        """
+        updated_self = self.hcli.api.perform_task(self['id'],
+                                                  self.hcli.api.DIRECTION_UP)
+        self._update(updated_self)
+
+    def create(self):
+        """
+        Used once to create the task on the HabitRPG database.
+        """
+        self._update(self.hcli.api.create_todo(dict(self)))
+
+    def delete(self):
+        """
+        Used to delete the task from the HabitRPG database.
+        """
+        self.hcli.api.delete_task(self['id'])
 
 
 class HabitCLI(object):
@@ -151,45 +179,48 @@ class HabitCLI(object):
         self.api = HabitAPI(user_id, api_key)
         return self.api
 
-    def get_user(self):
+    def get_user(self, refresh=False):
         """Get the user object from HabitRPG (if possible) or the cache."""
-        try:
-            self.user = self.api.user()
-            save_user(self.user)
-            self.user['cached'] = False
-        except ConnectionError:
-            self.user = load_user()
-            self.user['cached'] = True
+        if not refresh and hasattr(self, 'user') and self.user:
+            return self.user
+        else:
+            try:
+                self.user = self.api.user()
+                save_user(self.user)
+                self.user['cached'] = False
+            except ConnectionError:
+                self.user = load_user()
+                self.user['cached'] = True
 
-        if 'err' in self.user.keys():
-            print "Error '%s': Is the configuration in %s correct?" % \
-                (self.user['err'], get_default_config_filename())
-            sys.exit(1)
+            if 'err' in self.user.keys():
+                print "Error '%s': Is the configuration in %s correct?" % \
+                    (self.user['err'], get_default_config_filename())
+                sys.exit(1)
 
-        # Replace user['todos'] with todo objects
-        for index, todo in enumerate(self.user['todos']):
-            self.user['todos'][index] = Todo(todo, hcli=self)
+            # Replace user['todos'] with todo objects
+            for index, todo in enumerate(self.user['todos']):
+                self.user['todos'][index] = Todo(todo, hcli=self)
 
-        # Add tag dictionaries to the user object
-        tag_dict = defaultdict(lambda: "+missingtag")
-        reverse_tag_dict = defaultdict(unicode)
-        color_dict = defaultdict(lambda: lambda x: x)
-        for tag in [tag for tag in self.user['tags']
-                    if tag['name'] in self.config['tasks']]:
-            tag_dict[tag['id']] = tag['name']
-            reverse_tag_dict[tag['name']] = tag['id']
+            # Add tag dictionaries to the user object
+            tag_dict = defaultdict(lambda: "+missingtag")
+            reverse_tag_dict = defaultdict(unicode)
+            color_dict = defaultdict(lambda: lambda x: x)
+            for tag in [tag for tag in self.user['tags']
+                        if tag['name'] in self.config['tasks']]:
+                tag_dict[tag['id']] = tag['name']
+                reverse_tag_dict[tag['name']] = tag['id']
 
-            if tag['name'] in self.config['taskcolors'].keys():
-                if self.config['taskcolors'][tag['name']] in colors.COLORS:
-                    color = getattr(colors,
-                                    self.config['taskcolors'][tag['name']])
-                    color_dict[tag['name']] = color
-                    color_dict[tag['id']] = color
+                if tag['name'] in self.config['taskcolors'].keys():
+                    if self.config['taskcolors'][tag['name']] in colors.COLORS:
+                        color = getattr(colors,
+                                        self.config['taskcolors'][tag['name']])
+                        color_dict[tag['name']] = color
+                        color_dict[tag['id']] = color
 
-        self.user['tag_dict'] = tag_dict
-        self.user['reverse_tag_dict'] = reverse_tag_dict
-        self.user['color_dict'] = color_dict
-        return self.user
+            self.user['tag_dict'] = tag_dict
+            self.user['reverse_tag_dict'] = reverse_tag_dict
+            self.user['color_dict'] = color_dict
+            return self.user
 
     def get_todo_str(self,
                      todo,
@@ -347,30 +378,24 @@ class HabitCLI(object):
     @named('add')
     def add_todo(self, todo, due_date="", plan_date="", *tags):
         """Add a todo with optional tags and due date in natural language."""
-        added_tags = {}
+
+        new_todo = Todo(text=todo, hcli=self)
+
         for tag in tags:
             if tag.replace("+", "") in self.user['reverse_tag_dict'].keys():
                 tag_id = self.user['reverse_tag_dict'][tag.replace("+", "")]
-                added_tags[tag_id] = True
+                new_todo['tags'][tag_id] = True
             else:
                 valid_tags = self.user['reverse_tag_dict'].keys()
                 raise NoSuchTagException(tag, valid_tags)
 
-        due_date_obj = None
-        # Process the input date string into a datetime
-        new_todo = Todo()
         if due_date:
             new_todo.set_due_date(parse_datetime(due_date))
-            due_date_obj = new_todo['date']
 
-        note = None
         if plan_date:
-            plan_date_obj = parse_datetime(plan_date)
-            new_todo.set_planning_date(plan_date_obj)
-            note = new_todo['notes']
+            new_todo.set_planning_date(parse_datetime(plan_date))
 
-        self.api.create_task(self.api.TYPE_TODO, todo, date=due_date_obj,
-                             tags=added_tags, notes=note)
+        new_todo.create()
 
     @named('detail')
     def print_detailed_string(self, todo_string):
@@ -483,7 +508,7 @@ class HabitCLI(object):
         selected_todo = self.match_todo_by_string(todo_string)['todo']
         print "Delete '%s'?" % selected_todo['text']
         if confirm(resp=True):
-            self.api.delete_task(selected_todo['id'])
+            selected_todo.delete()
 
     @named('do')
     def complete_todo(self, *todos):
@@ -507,9 +532,8 @@ class HabitCLI(object):
 
             # Otherwise it is a normal to-do
             else:
-                response = self.api.perform_task(selected_todo['todo']['id'],
-                                                 self.api.DIRECTION_UP)
-                self._print_change(response)
+                selected_todo['todo'].complete()
+                self._print_change(selected_todo['todo'])
 
     def sort_nicely(self, todos):
         """Sort the todos by date and task."""
