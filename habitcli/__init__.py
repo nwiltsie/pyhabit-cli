@@ -96,7 +96,7 @@ class Todo(collections.MutableMapping):
         """
         self['notes'] = serialize_date(plan_date)
         if update:
-            self._update()
+            self.update_db()
 
     def get_due_date(self):
         """Extract the due date from the task as a datetime."""
@@ -111,7 +111,7 @@ class Todo(collections.MutableMapping):
         """Set the due date."""
         self['date'] = due_date.isoformat()
         if update:
-            self._update()
+            self.update_db()
 
     def has_tags(self, tags):
         """
@@ -121,12 +121,12 @@ class Todo(collections.MutableMapping):
         """
         return list(set(tags) & set(self['tags'].keys()))
 
-    def _update(self):
+    def update_db(self):
         """
         Call the HabitRPG API to update self, then replace self with the
         returned values.
         """
-        updated_self = self.hcli.update_todo(self)
+        updated_self = self.hcli.api.update_task(self['id'], dict(self))
         self.clear()
         self.update(updated_self)
 
@@ -446,9 +446,7 @@ class HabitCLI(object):
         todo['tags'][self.user['reverse_tag_dict'][tag]] = True
 
         if update:
-            return self.update_todo(todo)
-        else:
-            return todo
+            self.update_todo(todo)
 
     @named('addcheck')
     def add_checklist_item(self, check, parent_str):
@@ -464,12 +462,8 @@ class HabitCLI(object):
                 if 'checklist' not in parent.keys():
                     parent['checklist'] = []
                 parent['checklist'].append({'text': check, 'completed': False})
-                response = self.update_todo(parent)
-                print self.get_todo_str(response, completed_faint=True)
-
-    def update_todo(self, todo):
-        """Wrapper for the pyhabit update_task function."""
-        return self.api.update_task(todo['id'], todo)
+                parent.update_db()
+                print self.get_todo_str(parent, completed_faint=True)
 
     @named('plan')
     def update_todo_plan_date(self, todo, planned_date):
@@ -507,9 +501,9 @@ class HabitCLI(object):
                 # Mark the checklist item as complete and repost
                 check_index = selected_todo['check_index']
                 parent['checklist'][check_index]['completed'] = True
-                response = self.update_todo(parent)
+                parent.update_db()
                 # Print the remaining sections of the task
-                print self.get_todo_str(response, completed_faint=True)
+                print self.get_todo_str(parent, completed_faint=True)
 
             # Otherwise it is a normal to-do
             else:
