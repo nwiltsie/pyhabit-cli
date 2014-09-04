@@ -1,6 +1,5 @@
 """A GUI table-based todo editor for the HabitCLI interface."""
 # Standard lib imports
-import copy
 import Tkinter as tk
 import tkMessageBox
 import ttk
@@ -62,7 +61,7 @@ class SimpleTableInput(tk.Frame):
         tag = ttk.Combobox(self,
                            values=self.hcli.config['tasks']+[''],
                            state='readonly')
-        primary_tag = self.hcli.get_primary_tag(datum) or ""
+        primary_tag = datum.get_primary_tag()
         tag.set(primary_tag)
         tag.grid(row=row, column=1, sticky="nsew")
         tag.todo_id = datum['id']
@@ -71,7 +70,7 @@ class SimpleTableInput(tk.Frame):
 
     def _add_plan_field(self, datum, row):
         """Add a plan date field for the given todo."""
-        plan_date = self.hcli.get_planning_date(datum)
+        plan_date = datum.get_planning_date()
         plan_date_str = utils.format_date(plan_date)
         plan = tk.Entry(self, validate="all", validatecommand=self.val_date)
         plan.insert(0, plan_date_str)
@@ -82,7 +81,7 @@ class SimpleTableInput(tk.Frame):
 
     def _add_due_field(self, datum, row):
         """Add a due date field for the given todo."""
-        due_date = self.hcli.get_due_date(datum)
+        due_date = datum.get_due_date()
         due_str = utils.format_date(due_date)
         due = tk.Entry(self, validate="all", validatecommand=self.val_date)
         due.insert(0, due_str)
@@ -99,48 +98,55 @@ class SimpleTableInput(tk.Frame):
                 """Update the associated todo with the changed fields."""
                 refs = self.current_data[todo_id]
 
-                new_tag = refs.tag.get()
                 fragments = []
-                new_todo = copy.deepcopy(refs.old)
+                updates = {}
 
                 date_fmt_str = "%s:\n\tFrom: %s\n\tTo:     %s"
 
                 # Changes in planning date
                 if refs.plan.get():
-                    old_plan = self.hcli.get_planning_date(refs.old)
+                    old_plan = refs.old.get_planning_date()
                     new_plan = utils.parse_datetime(refs.plan.get())
                     if new_plan != old_plan:
                         fragments.append(date_fmt_str %
                                          ('Plan Date',
                                           utils.format_date(old_plan),
                                           utils.format_date(new_plan)))
-                        self.hcli.set_planning_date(new_todo, new_plan)
+                        updates['plan'] = new_plan
 
                 # Changes in due date
                 if refs.due.get():
-                    old_due = self.hcli.get_due_date(refs.old)
+                    old_due = refs.old.get_due_date()
                     new_due = utils.parse_datetime(refs.due.get())
                     if new_due != old_due:
                         fragments.append(date_fmt_str %
                                          ('Due Date',
                                           utils.format_date(old_due),
                                           utils.format_date(new_due)))
-                        self.hcli.set_due_date(new_todo, new_due)
+                        updates['due'] = new_due
 
                 # Changes in tag
-                old_tag = self.hcli.get_primary_tag(refs.old)
+                old_tag = refs.old.get_primary_tag()
+                new_tag = refs.tag.get()
                 if new_tag != old_tag:
                     fragments.append("Tag:\n\tFrom: %s\n\tTo: %s" %
                                      (old_tag, new_tag))
-                    self.hcli.set_primary_tag(new_todo, new_tag)
+                    updates['tag'] = new_tag
 
                 if fragments:
                     message = "\n".join(fragments)
                     if tkMessageBox.askyesno("Update %s?" %
-                                             new_todo['text'], message):
-                        print new_todo['text'], "updated!"
+                                             refs.old['text'], message):
 
-                        self.hcli.update_todo(new_todo)
+                        if 'tag' in updates:
+                            refs.old.set_primary_tag(updates['tag'])
+                        if 'plan' in updates:
+                            refs.old.set_planning_date(updates['plan'])
+                        if 'due' in updates:
+                            refs.old.set_due_date(updates['due'])
+
+                        refs.old.update_db()
+                        print refs.old['text'], "updated!"
 
                         # Disable everything
                         refs.label['state'] = 'disabled'
@@ -215,6 +221,7 @@ class TodoFrame(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.table = SimpleTableInput(self, hcli, data)
         self.table.pack(side="top", fill="both", expand=True)
+
 
 def make_gui(hcli=None, todos=None):
     """Show a graphical window where the todos can be editted."""
