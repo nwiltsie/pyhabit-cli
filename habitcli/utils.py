@@ -1,6 +1,7 @@
 """Utility functions for habitcli."""
 
 import ConfigParser
+import datetime
 import dateutil.parser
 import os
 import pickle
@@ -87,7 +88,11 @@ def deserialize_date(date_str):
         return dateutil.parser.parse(node.value)
 
     yaml.add_constructor(u'tag:yaml.org,2002:timestamp', timestamp_constructor)
-    return yaml.load(date_str)
+    loaded_data = yaml.load(date_str)
+    if isinstance(loaded_data, datetime.datetime):
+        return loaded_data
+    else:
+        return None
 
 
 def format_date(datetimeobj):

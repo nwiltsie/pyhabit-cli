@@ -108,6 +108,8 @@ class HabitCLI(object):
         """Extract the due date from the task as a datetime."""
         if 'date' in todo.keys() and todo['date']:
             return dateutil.parser.parse(todo['date'])
+        elif 'dateCompleted' in todo.keys() and todo['dateCompleted']:
+            return dateutil.parser.parse(todo['dateCompleted'])
         else:
             return None
 
@@ -194,9 +196,9 @@ class HabitCLI(object):
         if self.user['cached']:
             print 'Cached'
 
-        todos = [t for t in self.user['todos'] if 'completed' in t.keys()]
-
-        todos = [t for t in todos if completed or not t['completed']]
+        todos = [t for t in self.user['todos']
+                 if 'completed' in t.keys()
+                 and (completed or not t['completed'])]
 
         if tags:
             tag_ids = [self.user['reverse_tag_dict'][t.replace("+", "")]
