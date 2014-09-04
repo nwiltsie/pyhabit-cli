@@ -15,7 +15,9 @@ CACHE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class DateParseException(Exception):
+    """Exception for date parsing."""
     def __init__(self, value):
+        Exception.__init__(self)
         self.value = value
 
     def __str__(self):
@@ -23,7 +25,9 @@ class DateParseException(Exception):
 
 
 class DateFormatException(Exception):
+    """Exception for date formatting."""
     def __init__(self, value):
+        Exception.__init__(self)
         self.value = value
 
     def __str__(self):
@@ -87,6 +91,7 @@ def deserialize_date(date_str):
 
 
 def format_date(datetimeobj):
+    """Format a datetime into a nice date string."""
     if datetimeobj:
         return datetimeobj.strftime('%D at %H:%M')
     else:
@@ -183,12 +188,3 @@ def save_user(user):
 def load_user():
     """Load the user object from the cache."""
     return pickle.load(open(os.path.join(CACHE_DIR, ".habit.p"), 'rb'))
-
-
-def _get_incomplete_todos():
-    import habitcli
-    hcli = habitcli.HabitCLI()
-    user = hcli.get_user()
-    todos = [t for t in user['todos'] if 'completed' in t.keys()]
-    todos = [t for t in todos if not t['completed']]
-    return todos

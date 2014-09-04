@@ -28,6 +28,7 @@ from habitcli.utils import get_default_config_filename, save_user, load_user
 
 
 class HabitCLI(object):
+    """A class incorporating everything necessary to interact with HabitRPG."""
     def __init__(self):
         """Initialize the CLI object."""
         self.config = read_config()
@@ -105,7 +106,7 @@ class HabitCLI(object):
 
     def get_due_date(self, todo):
         """Extract the due date from the task as a datetime."""
-        if 'date' in todo.keys():
+        if 'date' in todo.keys() and todo['date']:
             return dateutil.parser.parse(todo['date'])
         else:
             return None
@@ -195,8 +196,7 @@ class HabitCLI(object):
 
         todos = [t for t in self.user['todos'] if 'completed' in t.keys()]
 
-        if not completed:
-            todos = [t for t in todos if not t['completed']]
+        todos = [t for t in todos if completed or not t['completed']]
 
         if tags:
             tag_ids = [self.user['reverse_tag_dict'][t.replace("+", "")]
@@ -212,9 +212,8 @@ class HabitCLI(object):
         if list_tasks:
             for task in self.config['tasks']:
                 print self.user['color_dict'][task](task),
-            else:
-                print
-                print
+            print
+            print
 
         def group_plan_date(todo):
             """
@@ -229,7 +228,7 @@ class HabitCLI(object):
             else:
                 return "Unplanned"
 
-        todos = self._nice_sort(todos)
+        todos = self.sort_nicely(todos)
 
         for plan_date, grouped_todos in groupby(todos, group_plan_date):
             print "%s:" % plan_date
@@ -444,7 +443,7 @@ class HabitCLI(object):
                                                  self.api.DIRECTION_UP)
                 self.print_change(response)
 
-    def _nice_sort(self, todos):
+    def sort_nicely(self, todos):
         """Sort the todos by date and task."""
         def sort_primary_tag(todo):
             """
@@ -481,8 +480,8 @@ class HabitCLI(object):
                 return localtz.localize(far_future_date)
 
         # Sort tasks by the task tag
-        todos.sort(key=sort_primary_tag)
         todos.sort(key=sort_due_key)
+        todos.sort(key=sort_primary_tag)
         # Sort tasks by the planned do-date
         todos.sort(key=sort_plan_key)
 
