@@ -27,6 +27,29 @@ from habitcli.utils import parse_datetime, read_config
 from habitcli.utils import get_default_config_filename, save_user, load_user
 
 
+class NoSuchTagException(Exception):
+    """Exception to designate missing tags."""
+    def __init__(self, tag, valid_tags):
+        Exception.__init__(self)
+        self.tag = tag
+        self.tag = valid_tags
+
+    def __str__(self):
+        return "Tag '%s' does not exist" % self.value
+
+
+class MultipleTasksException(Exception):
+    """Exception for when multiple primary tags are assigned to a todo."""
+    def __init__(self, todo, *tags):
+        Exception.__init__(self)
+        self.todo = todo
+        self.tags = tags
+
+    def __str__(self):
+        return "Todo '%s' has multiple tasks: %s" % \
+            (self.todo['id'], self.tags)
+
+
 class HabitCLI(object):
     """A class incorporating everything necessary to interact with HabitRPG."""
     def __init__(self):
@@ -284,7 +307,7 @@ class HabitCLI(object):
                 added_tags[tag_id] = True
             else:
                 valid_tags = self.user['reverse_tag_dict'].keys()
-                raise Exception("Tag %s not in %s" % (tag, str(valid_tags)))
+                raise NoSuchTagException(tag, valid_tags)
 
         due_date_obj = None
         # Process the input date string into a datetime
@@ -351,7 +374,9 @@ class HabitCLI(object):
                     if todo['tags'][t]]
 
         primary_tags = list(set(tag_strs) & set(self.config['tasks']))
-        assert len(primary_tags) <= 1, "There should only be one primary tag"
+
+        if len(primary_tags) > 1:
+            raise MultipleTasksException(todo['id'], primary_tags)
 
         if primary_tags:
             return primary_tags[0]
