@@ -21,7 +21,6 @@ class SimpleTableInput(tk.Frame):
 
         self.hcli = hcli
         self.data = data
-        self.current_data = {}
 
         # Register a command to use for validation
         self.val_date = (self.register(self._validate_date),
@@ -34,15 +33,11 @@ class SimpleTableInput(tk.Frame):
 
         # Create the table of widgets
         for row, datum in enumerate(self.data):
-            todo_id = datum['id']
-            self.current_data[todo_id] = ValueStore()
-            self.current_data[todo_id].old = datum
-
-            self._add_label(datum, row)
-            self._add_tag_field(datum, row)
-            self._add_plan_field(datum, row)
-            self._add_due_field(datum, row)
-            self._add_btn(datum, row)
+            label = self._add_label(datum, row)
+            tag = self._add_tag_field(datum, row)
+            plan = self._add_plan_field(datum, row)
+            due = self._add_due_field(datum, row)
+            self._add_btn(datum, row, label, tag, plan, due)
 
         # adjust column weights so they all expand equally
         for column in range(5):
@@ -54,7 +49,7 @@ class SimpleTableInput(tk.Frame):
         """Add a label for the given todo."""
         label = tk.Label(self, text=datum['text'])
         label.grid(row=row, column=0, sticky="w")
-        self.current_data[datum['id']].label = label
+        return label
 
     def _add_tag_field(self, datum, row):
         """Add a primary tag field for the given todo."""
@@ -64,8 +59,6 @@ class SimpleTableInput(tk.Frame):
         primary_tag = datum.get_primary_tag()
         tag.set(primary_tag)
         tag.grid(row=row, column=1, sticky="nsew")
-        tag.todo_id = datum['id']
-        self.current_data[datum['id']].tag = tag
         return tag
 
     def _add_plan_field(self, datum, row):
@@ -75,8 +68,6 @@ class SimpleTableInput(tk.Frame):
         plan = tk.Entry(self, validate="all", validatecommand=self.val_date)
         plan.insert(0, plan_date_str)
         plan.grid(row=row, column=2, sticky="nsew")
-        plan.todo_id = datum['id']
-        self.current_data[datum['id']].plan = plan
         return plan
 
     def _add_due_field(self, datum, row):
@@ -86,86 +77,74 @@ class SimpleTableInput(tk.Frame):
         due = tk.Entry(self, validate="all", validatecommand=self.val_date)
         due.insert(0, due_str)
         due.grid(row=row, column=3, sticky="nsew")
-        due.todo_id = datum['id']
-        self.current_data[datum['id']].due = due
         return due
 
-    def _add_btn(self, datum, row):
+    def _add_btn(self, datum, row, label, tag, plan, due):
         """Add update button for the given todo."""
-        def btn_callback_generator(todo_id):
-            """Generate a button callback with variables in scope."""
-            def btn_callback():
-                """Update the associated todo with the changed fields."""
-                refs = self.current_data[todo_id]
+        def btn_callback():
+            """Update the associated todo with the changed fields."""
+            fragments = []
+            updates = {}
 
-                fragments = []
-                updates = {}
+            date_fmt_str = "%s:\n\tFrom: %s\n\tTo:     %s"
 
-                date_fmt_str = "%s:\n\tFrom: %s\n\tTo:     %s"
+            # Changes in planning date
+            if plan.get():
+                old_plan = datum.get_planning_date()
+                new_plan = utils.parse_datetime(plan.get())
+                if new_plan != old_plan:
+                    fragments.append(date_fmt_str %
+                                     ('Plan Date',
+                                      utils.format_date(old_plan),
+                                      utils.format_date(new_plan)))
+                    updates['plan'] = new_plan
 
-                # Changes in planning date
-                if refs.plan.get():
-                    old_plan = refs.old.get_planning_date()
-                    new_plan = utils.parse_datetime(refs.plan.get())
-                    if new_plan != old_plan:
-                        fragments.append(date_fmt_str %
-                                         ('Plan Date',
-                                          utils.format_date(old_plan),
-                                          utils.format_date(new_plan)))
-                        updates['plan'] = new_plan
+            # Changes in due date
+            if due.get():
+                old_due = datum.get_due_date()
+                new_due = utils.parse_datetime(due.get())
+                if new_due != old_due:
+                    fragments.append(date_fmt_str %
+                                     ('Due Date',
+                                      utils.format_date(old_due),
+                                      utils.format_date(new_due)))
+                    updates['due'] = new_due
 
-                # Changes in due date
-                if refs.due.get():
-                    old_due = refs.old.get_due_date()
-                    new_due = utils.parse_datetime(refs.due.get())
-                    if new_due != old_due:
-                        fragments.append(date_fmt_str %
-                                         ('Due Date',
-                                          utils.format_date(old_due),
-                                          utils.format_date(new_due)))
-                        updates['due'] = new_due
+            # Changes in tag
+            old_tag = datum.get_primary_tag()
+            new_tag = tag.get()
+            if new_tag != old_tag:
+                fragments.append("Tag:\n\tFrom: %s\n\tTo: %s" %
+                                 (old_tag, new_tag))
+                updates['tag'] = new_tag
 
-                # Changes in tag
-                old_tag = refs.old.get_primary_tag()
-                new_tag = refs.tag.get()
-                if new_tag != old_tag:
-                    fragments.append("Tag:\n\tFrom: %s\n\tTo: %s" %
-                                     (old_tag, new_tag))
-                    updates['tag'] = new_tag
+            if fragments:
+                message = "\n".join(fragments)
+                if tkMessageBox.askyesno("Update %s?" %
+                                         datum['text'], message):
 
-                if fragments:
-                    message = "\n".join(fragments)
-                    if tkMessageBox.askyesno("Update %s?" %
-                                             refs.old['text'], message):
+                    if 'tag' in updates:
+                        datum.set_primary_tag(updates['tag'])
+                    if 'plan' in updates:
+                        datum.set_planning_date(updates['plan'])
+                    if 'due' in updates:
+                        datum.set_due_date(updates['due'])
 
-                        if 'tag' in updates:
-                            refs.old.set_primary_tag(updates['tag'])
-                        if 'plan' in updates:
-                            refs.old.set_planning_date(updates['plan'])
-                        if 'due' in updates:
-                            refs.old.set_due_date(updates['due'])
+                    datum.update_db()
+                    print datum['text'], "updated!"
 
-                        refs.old.update_db()
-                        print refs.old['text'], "updated!"
-
-                        # Disable everything
-                        refs.label['state'] = 'disabled'
-                        refs.tag['state'] = 'disabled'
-                        refs.plan['state'] = 'disabled'
-                        refs.due['state'] = 'disabled'
-                        refs.btn['state'] = 'disabled'
-
-            return btn_callback
+                    # Disable everything
+                    label['state'] = 'disabled'
+                    tag['state'] = 'disabled'
+                    plan['state'] = 'disabled'
+                    due['state'] = 'disabled'
 
         btn = tk.Button(self,
                         text="Update",
-                        state='disabled',
                         takefocus=True,
                         highlightbackground="BLUE",
-                        command=btn_callback_generator(datum['id']))
+                        command=btn_callback)
         btn.grid(row=row, column=4, sticky="nsew")
-        btn.todo_id = datum['id']
-        self.current_data[datum['id']].btn = btn
         return btn
 
     def example_validate(self, d, i, P, s, S, v, V, W):
@@ -191,8 +170,6 @@ class SimpleTableInput(tk.Frame):
         """
         widget = self.nametowidget(widget)
         if reason in ['focusin', 'key']:
-            if hasattr(widget, 'todo_id'):
-                self.current_data[widget.todo_id].btn['state'] = 'disabled'
             return True
         elif reason == 'focusout':
             # Return True if the date parses
@@ -202,7 +179,6 @@ class SimpleTableInput(tk.Frame):
                     widget.delete(0, 1000)
                     widget.insert(0,
                                   utils.format_date(dt))
-                self.current_data[widget.todo_id].btn['state'] = 'active'
                 widget.after_idle(widget.config, {'validate': validation})
                 return True
             except habitcli.utils.DateParseException:
