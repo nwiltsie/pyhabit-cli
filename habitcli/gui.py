@@ -23,6 +23,7 @@ class SimpleTableInput(tk.Frame):
         self.data = data
 
         # Register a command to use for validation
+        self.val_tag = (self.register(self._val_tag), '%P', '%W')
         self.val_date = (self.register(self._validate_date),
                          '%P',
                          '%V',
@@ -55,9 +56,11 @@ class SimpleTableInput(tk.Frame):
         """Add a primary tag field for the given todo."""
         tag = ttk.Combobox(self,
                            values=self.hcli.config['tasks']+[''],
-                           state='readonly')
+                           validate='all',
+                           validatecommand=self.val_tag)
         primary_tag = datum.get_primary_tag()
-        tag.set(primary_tag)
+        tag.set(primary_tag if primary_tag else "")
+        tag.original = primary_tag
         tag.grid(row=row, column=1, sticky="nsew")
         return tag
 
@@ -67,6 +70,9 @@ class SimpleTableInput(tk.Frame):
         plan_date_str = utils.format_date(plan_date)
         plan = tk.Entry(self, validate="all", validatecommand=self.val_date)
         plan.insert(0, plan_date_str)
+        if utils.is_past(plan_date):
+            plan['background'] = 'red'
+        plan.original = plan_date
         plan.grid(row=row, column=2, sticky="nsew")
         return plan
 
@@ -76,6 +82,9 @@ class SimpleTableInput(tk.Frame):
         due_str = utils.format_date(due_date)
         due = tk.Entry(self, validate="all", validatecommand=self.val_date)
         due.insert(0, due_str)
+        if utils.is_past(due_date):
+            due['background'] = 'red'
+        due.original = due_date
         due.grid(row=row, column=3, sticky="nsew")
         return due
 
@@ -131,13 +140,23 @@ class SimpleTableInput(tk.Frame):
                         datum.set_due_date(updates['due'])
 
                     datum.update_db()
-                    print datum['text'], "updated!"
 
-                    # Disable everything
-                    label['state'] = 'disabled'
-                    tag['state'] = 'disabled'
-                    plan['state'] = 'disabled'
-                    due['state'] = 'disabled'
+                    tag.original = datum.get_primary_tag()
+                    tag.original = tag.original if tag.original else ""
+                    tag.set(tag.original)
+                    self._val_tag(tag.get(), tag)
+
+                    plan.delete(0, 1000)
+                    plan.original = datum.get_planning_date()
+                    plan.insert(0, utils.format_date(plan.original))
+                    self._validate_date(plan.get(), 'focusout', plan, 'all')
+
+                    due.delete(0, 1000)
+                    due.original = datum.get_due_date()
+                    due.insert(0, utils.format_date(due.original))
+                    self._validate_date(due.get(), 'focusout', due, 'all')
+
+                    print datum['text'], "updated!"
 
         btn = tk.Button(self,
                         text="Update",
@@ -161,6 +180,17 @@ class SimpleTableInput(tk.Frame):
         print
         return True
 
+    def _val_tag(self, value, widget):
+        """Validate the tag combobox to change the color."""
+        if isinstance(widget, basestring):
+            widget = self.nametowidget(widget)
+        if hasattr(widget, 'original') and value != widget.original:
+            # fixme: why doesn't this work?
+            widget['background'] = 'green'
+        else:
+            widget['background'] = 'systemWindowBody'
+        widget.after_idle(widget.config, {'validate': widget['validate']})
+
     def _validate_date(self, value, reason, widget, validation):
         """
         Validate that the date string can be parsed.
@@ -168,17 +198,24 @@ class SimpleTableInput(tk.Frame):
         Will clear the field if focus is lost and the date cannot be parsed,
         and enable the associated 'Update' button if it can.
         """
-        widget = self.nametowidget(widget)
+        if isinstance(widget, basestring):
+            widget = self.nametowidget(widget)
         if reason in ['focusin', 'key']:
             return True
         elif reason == 'focusout':
             # Return True if the date parses
             try:
+                new_dt = None
                 if value:
-                    dt = utils.parse_datetime(value)
+                    new_dt = utils.parse_datetime(value)
                     widget.delete(0, 1000)
-                    widget.insert(0,
-                                  utils.format_date(dt))
+                    widget.insert(0, utils.format_date(new_dt))
+                if new_dt != widget.original:
+                    widget['background'] = 'green'
+                elif new_dt and utils.is_past(new_dt):
+                    widget['background'] = 'red'
+                else:
+                    widget['background'] = 'systemWindowBody'
                 widget.after_idle(widget.config, {'validate': validation})
                 return True
             except habitcli.utils.DateParseException:

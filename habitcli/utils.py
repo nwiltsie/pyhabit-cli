@@ -108,6 +108,19 @@ def parse_datetime(date_string):
     return aware_dt
 
 
+def is_past(datetimeobj):
+    """Returns True if the given date is in the past."""
+    if not datetimeobj:
+        return False
+    if os.environ.get('HABIT_TZ'):
+        localtz = pytz.timezone(os.environ.get('HABIT_TZ'))
+    else:
+        localtz = get_localzone()
+    aware_now = localtz.localize(datetime.datetime.now())
+
+    return datetimeobj < aware_now
+
+
 def get_default_config_filename():
     """Return the fully-expanded default config file path."""
     return os.path.join(os.path.expanduser("~"), ".habitrc")

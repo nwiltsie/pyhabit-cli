@@ -119,7 +119,7 @@ class Todo(collections.MutableMapping):
         """
         for task_id in [self.hcli.get_user()['reverse_tag_dict'][t]
                         for t in self.hcli.config['tasks']]:
-            if self['tags'].get([task_id]):
+            if self['tags'].get(task_id):
                 self['tags'][task_id] = False
 
         self['tags'][self.hcli.get_user()['reverse_tag_dict'][tag]] = True
